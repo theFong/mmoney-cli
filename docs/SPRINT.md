@@ -26,6 +26,8 @@ Understanding effort and file changes helps parallelize work and avoid merge con
 | [#4](https://github.com/theFong/mmoney-cli/issues/4) | Lint rules | S-M | `pyproject.toml`, `.github/workflows/ci.yml` |
 | [#1](https://github.com/theFong/mmoney-cli/issues/1) | Publish to PyPI | S | `pyproject.toml`, `.github/workflows/publish.yml` |
 | [#20](https://github.com/theFong/mmoney-cli/issues/20) | Git hooks (lint, test, secrets) | S | `.pre-commit-config.yaml`, `.secrets.baseline`, `pyproject.toml` |
+| [#21](https://github.com/theFong/mmoney-cli/issues/21) | Claude Code skill | S | `.claude/commands/mmoney.md`, `README.md` |
+| [#22](https://github.com/theFong/mmoney-cli/issues/22) | MCP server | M-L | `mmoney_mcp/` (new package), `pyproject.toml` |
 
 #### Localized (Low conflict risk)
 
@@ -61,6 +63,8 @@ Phase 1 (Parallel - no code changes)
 ├── #3  Dead code linting       [CI only]
 ├── #4  Lint rules              [CI only]
 ├── #20 Git hooks               [config only]
+├── #21 Claude Code skill       [new files only]
+├── #22 MCP server              [new package]
 └── #1  PyPI setup              [config only]
 
 Phase 2 (Sequential - touches cli.py)
@@ -84,7 +88,8 @@ These can run simultaneously without conflicts:
 | Documentation | #19, #13 | Agent A |
 | CI/CD | #3, #4, #20, #1 | Agent B |
 | Test Infrastructure | #17 | Agent C |
-| CLI Code | #15 → #6 → #8 → #9 → #7 | Agent D (sequential) |
+| Agent Integration | #21, #22 | Agent D |
+| CLI Code | #15 → #6 → #8 → #9 → #7 | Agent E (sequential) |
 
 ---
 
@@ -121,10 +126,14 @@ These can run simultaneously without conflicts:
 - [ ] Add logging (#8)
 - [ ] Improve error handling (#9)
 
-### 4. Distribution
+### 4. Agent Integration (Parallel)
+- [ ] Claude Code skill (#21)
+- [ ] MCP server (#22)
+
+### 5. Distribution
 - [ ] Publish to PyPI (#1)
 
-### 5. Future (After v1)
+### 6. Future (After v1)
 - [ ] Refactor cli.py into modules (#7)
 
 ---
