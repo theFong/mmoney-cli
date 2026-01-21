@@ -11,12 +11,17 @@ Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchm
 ## Installation
 
 ```bash
-# Using uv (recommended)
-uv tool install mmoney-cli
+# One-liner (recommended - works on macOS, Linux, Windows)
+pipx install mmoney
 
-# Or using pip
-pip install mmoney-cli
+# Alternative: Using uv
+uv tool install mmoney
+
+# Alternative: Using pip (may require adding to PATH)
+pip install mmoney
 ```
+
+> **Note:** `pipx` and `uv tool` automatically handle PATH setup. If using `pip` and `mmoney` isn't found, you may need to add Python's bin directory to your PATH or use `python -m mmoney_cli.cli` instead.
 
 ## Development
 
@@ -146,7 +151,7 @@ mmoney accounts list | jq '.accounts[] | {name: .displayName, balance: .currentB
 
 ## Session Storage
 
-Sessions are stored in `.mm/mm_session.pickle` in the current directory.
+Sessions are stored securely using your system's keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Falls back to `~/.mmoney/session.pickle` if keychain is unavailable.
 
 ## Authentication Methods
 
