@@ -76,26 +76,42 @@ def auth():
 def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, interactive):
     """Login to Monarch Money.
 
-    For MFA login with a one-time code:
+    GETTING YOUR TOKEN FROM THE BROWSER:
 
     \b
+    1. Open https://app.monarchmoney.com and log in
+    2. Open Chrome DevTools (F12 or Cmd+Option+I on Mac)
+    3. Go to Application tab > Local Storage > https://app.monarchmoney.com
+    4. Find 'accessToken' and copy its value (long string starting with letters/numbers)
+    5. Run: mmoney auth login --token YOUR_TOKEN
+
+    GETTING YOUR DEVICE UUID (for MFA bypass):
+
+    \b
+    1. Open https://app.monarchmoney.com and log in
+    2. Open Chrome DevTools (F12 or Cmd+Option+I on Mac)
+    3. Go to Console tab
+    4. Type: localStorage.getItem('monarchDeviceUUID')
+    5. Copy the returned UUID (without quotes)
+    6. Run: mmoney auth login --device-uuid YOUR_UUID -e email -p password
+
+    OTHER LOGIN METHODS:
+
+    \b
+    # Interactive login (prompts for email/password)
+    mmoney auth login
+
+    \b
+    # With credentials directly
+    mmoney auth login --no-interactive -e email -p password
+
+    \b
+    # With one-time MFA code from authenticator app
     mmoney auth login --mfa-code 123456 -e email -p password
 
-    For captcha-blocked logins, use --token with a token from your browser:
-
     \b
-    1. Login at app.monarchmoney.com
-    2. Open DevTools > Application > Local Storage
-    3. Copy the 'accessToken' value
-    4. Run: mmoney auth login --token YOUR_TOKEN
-
-    For MFA-blocked logins (even without MFA enabled), use --device-uuid:
-
-    \b
-    1. Login at app.monarchmoney.com
-    2. Open DevTools > Console
-    3. Run: localStorage.getItem('monarchDeviceUUID')
-    4. Run: mmoney auth login --device-uuid YOUR_UUID -e email -p password
+    # With MFA secret for automatic TOTP generation
+    mmoney auth login --mfa-secret JBSWY3DPEHPK3PXP -e email -p password
 
     Tip: Use Claude Code with the browser extension to automate token extraction!
     """
