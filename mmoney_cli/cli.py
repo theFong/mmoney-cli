@@ -480,9 +480,10 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 )
             )
             if mm.token and save_token_to_keychain(mm.token):
-                pass  # Saved to keychain
+                click.echo("Session saved to system keychain.")
             else:
                 mm.save_session()  # Fallback to file
+                click.echo("Session saved to file (keychain not available).")
         except Exception as e:
             output_error(
                 code=ErrorCode.AUTH_MFA_FAILED,
@@ -491,12 +492,13 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 exit_code=ExitCode.AUTH_ERROR,
             )
     elif interactive:
-        run_async(mm.interactive_login())
+        run_async(mm.interactive_login(save_session=False))
         # Save to keychain after interactive login
         if mm.token and save_token_to_keychain(mm.token):
-            pass  # Saved to keychain
+            click.echo("Session saved to system keychain.")
         else:
             mm.save_session()  # Fallback to file
+            click.echo("Session saved to file (keychain not available).")
     else:
         if not email or not password:
             output_error(
@@ -507,13 +509,14 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             )
         try:
             run_async(
-                mm.login(email=email, password=password, mfa_secret_key=mfa_secret)
+                mm.login(email=email, password=password, mfa_secret_key=mfa_secret, save_session=False)
             )
             # Save to keychain after successful login
             if mm.token and save_token_to_keychain(mm.token):
-                pass  # Saved to keychain
+                click.echo("Session saved to system keychain.")
             else:
                 mm.save_session()  # Fallback to file
+                click.echo("Session saved to file (keychain not available).")
         except Exception as e:
             output_error(
                 code=ErrorCode.AUTH_FAILED,
