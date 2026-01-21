@@ -24,16 +24,18 @@ class TestAuthCommands:
 
     def test_auth_login_with_token(self, runner):
         """Test login with token."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
+             patch("mmoney_cli.cli.save_token_to_keychain") as mock_keychain:
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
+            mock_keychain.return_value = True  # Keychain save succeeds
 
             result = runner.invoke(cli, ["auth", "login", "--token", "test_token_123"])
 
             assert result.exit_code == 0
             assert "Token saved" in result.output
             mm_instance.set_token.assert_called_once_with("test_token_123")
-            mm_instance.save_session.assert_called_once()
+            mock_keychain.assert_called_once_with("test_token_123")
 
     def test_auth_login_with_mfa_code(self, runner):
         """Test login with one-time MFA code."""

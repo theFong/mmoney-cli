@@ -1138,3 +1138,161 @@ class TestOutputFormatCLIOption:
 
         assert result.exit_code != 0
         assert "Invalid value" in result.output or "invalid" in result.output.lower()
+
+
+# ============================================================================
+# Keychain Storage Tests
+# ============================================================================
+
+
+class TestKeychainStorage:
+    """Tests for keychain storage functionality."""
+
+    def test_save_token_to_keychain_success(self):
+        """Test saving token to keychain."""
+        from mmoney_cli.cli import save_token_to_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            result = save_token_to_keychain("test_token")
+
+            assert result is True
+            mock_keyring.set_password.assert_called_once_with(
+                "mmoney-cli", "monarch-token", "test_token"
+            )
+
+    def test_save_token_to_keychain_failure(self):
+        """Test saving token to keychain when keyring fails."""
+        from mmoney_cli.cli import save_token_to_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            mock_keyring.set_password.side_effect = Exception("Keychain error")
+            result = save_token_to_keychain("test_token")
+
+            assert result is False
+
+    def test_load_token_from_keychain_success(self):
+        """Test loading token from keychain."""
+        from mmoney_cli.cli import load_token_from_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            mock_keyring.get_password.return_value = "saved_token"
+            result = load_token_from_keychain()
+
+            assert result == "saved_token"
+            mock_keyring.get_password.assert_called_once_with(
+                "mmoney-cli", "monarch-token"
+            )
+
+    def test_load_token_from_keychain_not_found(self):
+        """Test loading token when not in keychain."""
+        from mmoney_cli.cli import load_token_from_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            mock_keyring.get_password.return_value = None
+            result = load_token_from_keychain()
+
+            assert result is None
+
+    def test_load_token_from_keychain_failure(self):
+        """Test loading token when keyring fails."""
+        from mmoney_cli.cli import load_token_from_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            mock_keyring.get_password.side_effect = Exception("Keychain error")
+            result = load_token_from_keychain()
+
+            assert result is None
+
+    def test_delete_token_from_keychain_success(self):
+        """Test deleting token from keychain."""
+        from mmoney_cli.cli import delete_token_from_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            result = delete_token_from_keychain()
+
+            assert result is True
+            mock_keyring.delete_password.assert_called_once_with(
+                "mmoney-cli", "monarch-token"
+            )
+
+    def test_delete_token_from_keychain_failure(self):
+        """Test deleting token when keyring fails."""
+        from mmoney_cli.cli import delete_token_from_keychain
+
+        with patch("mmoney_cli.cli.keyring") as mock_keyring:
+            mock_keyring.delete_password.side_effect = Exception("Keychain error")
+            result = delete_token_from_keychain()
+
+            assert result is False
+
+    def test_get_client_uses_keychain_first(self):
+        """Test get_client tries keychain before file."""
+        with patch("mmoney_cli.cli.load_token_from_keychain") as mock_load, \
+             patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+            mock_load.return_value = "keychain_token"
+            mm_instance = MagicMock()
+            MockMM.return_value = mm_instance
+
+            from mmoney_cli.cli import get_client
+            client = get_client()
+
+            mock_load.assert_called_once()
+            mm_instance.set_token.assert_called_once_with("keychain_token")
+            mm_instance.load_session.assert_not_called()
+
+    def test_get_client_falls_back_to_file(self):
+        """Test get_client falls back to file when keychain empty."""
+        with patch("mmoney_cli.cli.load_token_from_keychain") as mock_load, \
+             patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+            mock_load.return_value = None
+            mm_instance = MagicMock()
+            MockMM.return_value = mm_instance
+
+            from mmoney_cli.cli import get_client
+            client = get_client()
+
+            mock_load.assert_called_once()
+            mm_instance.set_token.assert_not_called()
+            mm_instance.load_session.assert_called_once()
+
+    def test_auth_login_token_saves_to_keychain(self, runner):
+        """Test auth login with token saves to keychain."""
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
+             patch("mmoney_cli.cli.save_token_to_keychain") as mock_save:
+            mm_instance = MagicMock()
+            MockMM.return_value = mm_instance
+            mock_save.return_value = True
+
+            result = runner.invoke(cli, ["auth", "login", "--token", "my_token"])
+
+            assert result.exit_code == 0
+            mock_save.assert_called_once_with("my_token")
+            assert "keychain" in result.output.lower()
+
+    def test_auth_login_token_fallback_to_file(self, runner):
+        """Test auth login falls back to file when keychain fails."""
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
+             patch("mmoney_cli.cli.save_token_to_keychain") as mock_save:
+            mm_instance = MagicMock()
+            MockMM.return_value = mm_instance
+            mock_save.return_value = False  # Keychain fails
+
+            result = runner.invoke(cli, ["auth", "login", "--token", "my_token"])
+
+            assert result.exit_code == 0
+            mm_instance.save_session.assert_called_once()
+            assert "file" in result.output.lower()
+
+    def test_auth_logout_clears_keychain(self, runner):
+        """Test auth logout clears keychain."""
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
+             patch("mmoney_cli.cli.delete_token_from_keychain") as mock_delete:
+            mm_instance = MagicMock()
+            MockMM.return_value = mm_instance
+            mock_delete.return_value = True
+
+            result = runner.invoke(cli, ["auth", "logout"])
+
+            assert result.exit_code == 0
+            mock_delete.assert_called_once()
+            mm_instance.delete_session.assert_called_once()

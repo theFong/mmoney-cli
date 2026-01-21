@@ -11,6 +11,7 @@ from datetime import date
 from typing import Optional, List, Any, Dict
 
 import click
+import keyring
 
 # Context keys
 _ALLOW_MUTATIONS = "allow_mutations"
@@ -246,9 +247,63 @@ def run_async(coro):
     return asyncio.run(coro)
 
 
+# ============================================================================
+# Keychain Storage
+# ============================================================================
+
+_KEYRING_SERVICE = "mmoney-cli"
+_KEYRING_USERNAME = "monarch-token"
+
+
+def save_token_to_keychain(token: str) -> bool:
+    """Save auth token to system keychain.
+
+    Returns True if successful, False if keyring is not available.
+    """
+    try:
+        keyring.set_password(_KEYRING_SERVICE, _KEYRING_USERNAME, token)
+        return True
+    except Exception:
+        return False
+
+
+def load_token_from_keychain() -> Optional[str]:
+    """Load auth token from system keychain.
+
+    Returns the token if found, None otherwise.
+    """
+    try:
+        return keyring.get_password(_KEYRING_SERVICE, _KEYRING_USERNAME)
+    except Exception:
+        return None
+
+
+def delete_token_from_keychain() -> bool:
+    """Delete auth token from system keychain.
+
+    Returns True if successful, False otherwise.
+    """
+    try:
+        keyring.delete_password(_KEYRING_SERVICE, _KEYRING_USERNAME)
+        return True
+    except Exception:
+        return False
+
+
 def get_client():
-    """Get a MonarchMoney client with loaded session."""
+    """Get a MonarchMoney client with loaded session.
+
+    Tries keychain first, then falls back to pickle file.
+    """
     mm = MonarchMoney()
+
+    # Try keychain first
+    token = load_token_from_keychain()
+    if token:
+        mm.set_token(token)
+        return mm
+
+    # Fall back to pickle file
     try:
         mm.load_session()
     except Exception:
@@ -399,8 +454,11 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
 
     if token:
         mm.set_token(token)
-        mm.save_session()
-        click.echo("Token saved! Session authenticated.")
+        if save_token_to_keychain(token):
+            click.echo("Token saved to system keychain.")
+        else:
+            mm.save_session()
+            click.echo("Token saved to file (keychain not available).")
         return
 
     if device_uuid:
@@ -421,7 +479,10 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                     email=email, password=password, code=mfa_code
                 )
             )
-            mm.save_session()
+            if mm.token and save_token_to_keychain(mm.token):
+                pass  # Saved to keychain
+            else:
+                mm.save_session()  # Fallback to file
         except Exception as e:
             output_error(
                 code=ErrorCode.AUTH_MFA_FAILED,
@@ -431,6 +492,11 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             )
     elif interactive:
         run_async(mm.interactive_login())
+        # Save to keychain after interactive login
+        if mm.token and save_token_to_keychain(mm.token):
+            pass  # Saved to keychain
+        else:
+            mm.save_session()  # Fallback to file
     else:
         if not email or not password:
             output_error(
@@ -443,6 +509,11 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             run_async(
                 mm.login(email=email, password=password, mfa_secret_key=mfa_secret)
             )
+            # Save to keychain after successful login
+            if mm.token and save_token_to_keychain(mm.token):
+                pass  # Saved to keychain
+            else:
+                mm.save_session()  # Fallback to file
         except Exception as e:
             output_error(
                 code=ErrorCode.AUTH_FAILED,
@@ -456,24 +527,43 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
 
 @auth.command("logout")
 def auth_logout():
-    """Delete saved session."""
+    """Delete saved session from keychain and file."""
+    # Delete from keychain
+    keychain_deleted = delete_token_from_keychain()
+
+    # Also delete pickle file if it exists
     mm = MonarchMoney()
-    mm.delete_session()
-    click.echo("Session deleted.")
+    try:
+        mm.delete_session()
+        file_deleted = True
+    except Exception:
+        file_deleted = False
+
+    if keychain_deleted or file_deleted:
+        click.echo("Session deleted.")
+    else:
+        click.echo("No session found.")
 
 
 @auth.command("status")
 def auth_status():
     """Check authentication status."""
+    # Check keychain first
+    token = load_token_from_keychain()
+    if token:
+        click.echo("Authenticated (keychain)")
+        return
+
+    # Fall back to pickle file
     mm = MonarchMoney()
     try:
         mm.load_session()
         if mm.token:
-            click.echo("Authenticated (session loaded)")
+            click.echo("Authenticated (file)")
         else:
             click.echo("Not authenticated")
     except Exception:
-        click.echo("Not authenticated (no session found)")
+        click.echo("Not authenticated")
 
 
 # ============================================================================
