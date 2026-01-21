@@ -1,8 +1,9 @@
 """Tests for mmoney CLI commands."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from click.testing import CliRunner
 
 from mmoney_cli.cli import cli
@@ -24,8 +25,10 @@ class TestAuthCommands:
 
     def test_auth_login_with_token(self, runner):
         """Test login with token."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
-             patch("mmoney_cli.cli.save_token_to_keychain") as mock_keychain:
+        with (
+            patch("mmoney_cli.cli.MonarchMoney") as MockMM,
+            patch("mmoney_cli.cli.save_token_to_keychain") as mock_keychain,
+        ):
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
             mock_keychain.return_value = True  # Keychain save succeeds
@@ -47,10 +50,14 @@ class TestAuthCommands:
             result = runner.invoke(
                 cli,
                 [
-                    "auth", "login",
-                    "--mfa-code", "123456",
-                    "-e", "test@example.com",
-                    "-p", "password123",
+                    "auth",
+                    "login",
+                    "--mfa-code",
+                    "123456",
+                    "-e",
+                    "test@example.com",
+                    "-p",
+                    "password123",
                 ],
             )
 
@@ -87,10 +94,14 @@ class TestAuthCommands:
             result = runner.invoke(
                 cli,
                 [
-                    "auth", "login",
-                    "--device-uuid", "test-uuid-123",
-                    "-e", "test@example.com",
-                    "-p", "password123",
+                    "auth",
+                    "login",
+                    "--device-uuid",
+                    "test-uuid-123",
+                    "-e",
+                    "test@example.com",
+                    "-p",
+                    "password123",
                     "--no-interactive",
                 ],
             )
@@ -194,11 +205,16 @@ class TestAccountsCommands:
                 cli,
                 [
                     "--allow-mutations",
-                    "accounts", "create",
-                    "--name", "Test Account",
-                    "--type", "depository",
-                    "--subtype", "checking",
-                    "--balance", "1000",
+                    "accounts",
+                    "create",
+                    "--name",
+                    "Test Account",
+                    "--type",
+                    "depository",
+                    "--subtype",
+                    "checking",
+                    "--balance",
+                    "1000",
                 ],
             )
 
@@ -290,11 +306,16 @@ class TestTransactionsCommands:
             result = runner.invoke(
                 cli,
                 [
-                    "transactions", "list",
-                    "--start-date", "2024-01-01",
-                    "--end-date", "2024-01-31",
-                    "--account-id", "123",
-                    "--category-id", "cat_001",
+                    "transactions",
+                    "list",
+                    "--start-date",
+                    "2024-01-01",
+                    "--end-date",
+                    "2024-01-31",
+                    "--account-id",
+                    "123",
+                    "--category-id",
+                    "cat_001",
                 ],
             )
 
@@ -341,12 +362,18 @@ class TestTransactionsCommands:
                 cli,
                 [
                     "--allow-mutations",
-                    "transactions", "create",
-                    "--date", "2024-01-15",
-                    "--account-id", "123",
-                    "--amount", "-50.00",
-                    "--merchant", "Coffee Shop",
-                    "--category-id", "cat_001",
+                    "transactions",
+                    "create",
+                    "--date",
+                    "2024-01-15",
+                    "--account-id",
+                    "123",
+                    "--amount",
+                    "-50.00",
+                    "--merchant",
+                    "Coffee Shop",
+                    "--category-id",
+                    "cat_001",
                 ],
             )
 
@@ -363,7 +390,14 @@ class TestTransactionsCommands:
 
             result = runner.invoke(
                 cli,
-                ["--allow-mutations", "transactions", "update", "txn_001", "--merchant", "New Merchant"],
+                [
+                    "--allow-mutations",
+                    "transactions",
+                    "update",
+                    "txn_001",
+                    "--merchant",
+                    "New Merchant",
+                ],
             )
 
             assert result.exit_code == 0
@@ -376,7 +410,9 @@ class TestTransactionsCommands:
             mm_instance.delete_transaction = AsyncMock(return_value=True)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["--allow-mutations", "transactions", "delete", "txn_001", "--yes"])
+            result = runner.invoke(
+                cli, ["--allow-mutations", "transactions", "delete", "txn_001", "--yes"]
+            )
 
             assert result.exit_code == 0
             mm_instance.delete_transaction.assert_called_once_with("txn_001")
@@ -472,7 +508,9 @@ class TestCategoriesCommands:
         """Test categories list command."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_transaction_categories = AsyncMock(return_value=mock_categories_response)
+            mm_instance.get_transaction_categories = AsyncMock(
+                return_value=mock_categories_response
+            )
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(cli, ["-f", "json", "categories", "list"])
@@ -505,7 +543,15 @@ class TestCategoriesCommands:
 
             result = runner.invoke(
                 cli,
-                ["--allow-mutations", "categories", "create", "--group-id", "grp_001", "--name", "New Category"],
+                [
+                    "--allow-mutations",
+                    "categories",
+                    "create",
+                    "--group-id",
+                    "grp_001",
+                    "--name",
+                    "New Category",
+                ],
             )
 
             assert result.exit_code == 0
@@ -518,7 +564,9 @@ class TestCategoriesCommands:
             mm_instance.delete_transaction_category = AsyncMock(return_value=True)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["--allow-mutations", "categories", "delete", "cat_001", "--yes"])
+            result = runner.invoke(
+                cli, ["--allow-mutations", "categories", "delete", "cat_001", "--yes"]
+            )
 
             assert result.exit_code == 0
             mm_instance.delete_transaction_category.assert_called_once_with("cat_001")
@@ -553,7 +601,9 @@ class TestTagsCommands:
             mm_instance.create_transaction_tag = AsyncMock(return_value=mock_result)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["--allow-mutations", "tags", "create", "--name", "New Tag"])
+            result = runner.invoke(
+                cli, ["--allow-mutations", "tags", "create", "--name", "New Tag"]
+            )
 
             assert result.exit_code == 0
             mm_instance.create_transaction_tag.assert_called_once()
@@ -568,7 +618,16 @@ class TestTagsCommands:
 
             result = runner.invoke(
                 cli,
-                ["--allow-mutations", "tags", "set", "txn_001", "--tag-id", "tag_001", "--tag-id", "tag_002"],
+                [
+                    "--allow-mutations",
+                    "tags",
+                    "set",
+                    "txn_001",
+                    "--tag-id",
+                    "tag_001",
+                    "--tag-id",
+                    "tag_002",
+                ],
             )
 
             assert result.exit_code == 0
@@ -621,7 +680,15 @@ class TestBudgetsCommands:
 
             result = runner.invoke(
                 cli,
-                ["--allow-mutations", "budgets", "set", "--amount", "500", "--category-id", "cat_001"],
+                [
+                    "--allow-mutations",
+                    "budgets",
+                    "set",
+                    "--amount",
+                    "500",
+                    "--category-id",
+                    "cat_001",
+                ],
             )
 
             assert result.exit_code == 0
@@ -750,7 +817,9 @@ class TestSubscriptionCommands:
         """Test subscription status command."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_subscription_details = AsyncMock(return_value=mock_subscription_response)
+            mm_instance.get_subscription_details = AsyncMock(
+                return_value=mock_subscription_response
+            )
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(cli, ["-f", "json", "subscription", "status"])

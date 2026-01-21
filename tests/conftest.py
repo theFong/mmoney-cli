@@ -1,7 +1,8 @@
 """Pytest fixtures for mmoney-cli tests."""
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture
