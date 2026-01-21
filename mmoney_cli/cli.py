@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
 """Monarch Money CLI - Command line interface for the Monarch Money API."""
 
+from __future__ import annotations
+
 import asyncio
 import csv
 import functools
 import io
 import json
 import sys
+from collections.abc import Callable, Coroutine
 from datetime import date
 from pathlib import Path
-from __future__ import annotations
-
-from collections.abc import Callable, Coroutine
-from typing import TYPE_CHECKING, Any, NoReturn, TypeVar
-
-if TYPE_CHECKING:
-    pass
-
-T = TypeVar("T")
+from typing import Any, NoReturn, TypeVar
 
 import click
 import keyring
 from monarchmoney import MonarchMoney
+
+T = TypeVar("T")
 
 # Context keys
 _ALLOW_MUTATIONS = "allow_mutations"
