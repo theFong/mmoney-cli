@@ -76,53 +76,41 @@ def auth():
 def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, interactive):
     """Login to Monarch Money.
 
-    GETTING YOUR TOKEN FROM THE BROWSER (Manual):
+    AUTHENTICATION METHODS (in order of preference):
+
+    1. EMAIL + PASSWORD + MFA SECRET (Best - longest lasting, fully automated):
 
     \b
-    1. Open https://app.monarchmoney.com and log in
-    2. Open Chrome DevTools (F12 or Cmd+Option+I on Mac)
-    3. Go to Application tab > Local Storage > https://app.monarchmoney.com
-    4. Find 'accessToken' and copy its value (long string starting with letters/numbers)
-    5. Run: mmoney auth login --token YOUR_TOKEN
+       Enable MFA in Monarch settings. When setting up your authenticator app,
+       copy the secret key (shown alongside the QR code). This lets the CLI
+       generate TOTP codes automatically.
+       mmoney auth login -e EMAIL -p PASSWORD --mfa-secret YOUR_SECRET --no-interactive
 
-    GETTING YOUR TOKEN (Programmatic via Console):
-
-    \b
-    1. Open https://app.monarchmoney.com and log in
-    2. Open Chrome DevTools Console (F12 > Console tab)
-    3. Run: copy(localStorage.getItem('accessToken'))
-    4. Token is now in your clipboard
-    5. Run: mmoney auth login --token YOUR_TOKEN
-
-    GETTING YOUR DEVICE UUID (for MFA bypass):
+    2. EMAIL + PASSWORD + MFA CODE (Requires manual code entry):
 
     \b
-    1. Open https://app.monarchmoney.com and log in
-    2. Open Chrome DevTools (F12 or Cmd+Option+I on Mac)
-    3. Go to Console tab
-    4. Type: localStorage.getItem('monarchDeviceUUID')
-    5. Copy the returned UUID (without quotes)
-    6. Run: mmoney auth login --device-uuid YOUR_UUID -e email -p password
+       Use the 6-digit code from your authenticator app.
+       mmoney auth login -e EMAIL -p PASSWORD --mfa-code 123456
 
-    OTHER LOGIN METHODS:
+    3. EMAIL + PASSWORD + DEVICE UUID (Requires browser):
 
     \b
-    # Interactive login (prompts for email/password)
-    mmoney auth login
+       Get device UUID from browser to bypass MFA requirement:
+       a. Open https://app.monarch.com and log in
+       b. Open DevTools Console (F12 > Console tab)
+       c. Run: copy(localStorage.getItem('monarchDeviceUUID'))
+       d. Run: mmoney auth login -e EMAIL -p PASSWORD --device-uuid YOUR_UUID --no-interactive
+
+    4. TOKEN FROM BROWSER (Shortest lived):
 
     \b
-    # With credentials directly
-    mmoney auth login --no-interactive -e email -p password
-
-    \b
-    # With one-time MFA code from authenticator app
-    mmoney auth login --mfa-code 123456 -e email -p password
-
-    \b
-    # With MFA secret for automatic TOTP generation
-    mmoney auth login --mfa-secret JBSWY3DPEHPK3PXP -e email -p password
-
-    Tip: Use Claude Code with the browser extension to automate token extraction!
+       Get token from browser Network tab:
+       a. Open https://app.monarch.com and log in
+       b. Open DevTools Network tab, refresh page
+       c. Click any 'graphql' request
+       d. In Headers, find 'Authorization: Token YOUR_TOKEN'
+       e. Copy the token value (after 'Token ')
+       f. Run: mmoney auth login --token YOUR_TOKEN
     """
     mm = MonarchMoney()
 

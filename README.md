@@ -29,21 +29,21 @@ uv run mmoney --help
 ## Quick Start
 
 ```bash
-# Login (interactive)
-mmoney auth login
+# Best: Email + Password + MFA Secret (longest lasting, fully automated)
+# Enable MFA in Monarch settings, copy the secret key when setting up authenticator
+mmoney auth login -e your@email.com -p yourpassword --mfa-secret YOUR_SECRET --no-interactive
 
-# Or login with credentials
-mmoney auth login --no-interactive -e your@email.com -p yourpassword
+# Good: Email + Password + MFA Code (requires manual code entry)
+mmoney auth login -e your@email.com -p yourpassword --mfa-code 123456
 
-# If blocked by MFA (even without MFA enabled), use device UUID from browser:
-# 1. Open app.monarchmoney.com in browser
-# 2. Open DevTools > Console
-# 3. Run: localStorage.getItem('monarchDeviceUUID')
-mmoney auth login --device-uuid YOUR_UUID -e your@email.com -p yourpassword
+# Alternative: Email + Password + Device UUID (requires browser)
+# 1. Open app.monarch.com, login, open DevTools Console
+# 2. Run: copy(localStorage.getItem('monarchDeviceUUID'))
+mmoney auth login -e your@email.com -p yourpassword --device-uuid YOUR_UUID --no-interactive
 
-# Or use token directly from browser:
-# 1. Open app.monarchmoney.com
-# 2. DevTools > Application > Local Storage > accessToken
+# Fallback: Token from browser (shortest lived)
+# 1. Open app.monarch.com, login, open DevTools Network tab
+# 2. Click any 'graphql' request, find 'Authorization: Token YOUR_TOKEN' in Headers
 mmoney auth login --token YOUR_TOKEN
 ```
 
@@ -144,13 +144,16 @@ mmoney accounts list | jq '.accounts[] | {name: .displayName, balance: .currentB
 
 Sessions are stored in `.mm/mm_session.pickle` in the current directory.
 
-## Authentication Troubleshooting
+## Authentication Methods
 
-If you see "Multi-Factor Auth Required" even without MFA enabled, Monarch is using device fingerprinting. Solutions:
+Recommended authentication methods in order of preference:
 
-1. **Device UUID** (recommended): Get from browser and use `--device-uuid`
-2. **Token**: Get auth token from browser Local Storage
-3. **MFA Secret**: If you have MFA enabled, use `--mfa-secret` with your TOTP secret
+1. **MFA Secret** (Best): Enable MFA in Monarch, copy the secret key when setting up your authenticator. Use `--mfa-secret` for fully automated, long-lasting auth
+2. **MFA Code**: Use `--mfa-code` with the 6-digit code from your authenticator app
+3. **Device UUID**: Get from browser console with `localStorage.getItem('monarchDeviceUUID')` and use `--device-uuid`
+4. **Token**: Get from browser Network tab (Authorization header) and use `--token` - shortest lived
+
+Run `mmoney auth login --help` for detailed instructions on each method.
 
 ## License
 
