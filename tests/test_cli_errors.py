@@ -5,7 +5,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from click.testing import CliRunner
 
-from mmoney_cli.cli import cli, output_json, output_error, get_client, run_async, ExitCode, ErrorCode
+from mmoney_cli.cli import (
+    cli, output_json, output_jsonl, output_csv, output_text, output_data, output_error,
+    get_client, run_async, ExitCode, ErrorCode, OutputFormat, _flatten_dict, _extract_records
+)
 
 
 @pytest.fixture
@@ -915,3 +918,223 @@ class TestOutputError:
         assert "details" not in error["error"]
         assert error["error"]["code"] == "TEST_ERROR"
         assert error["error"]["message"] == "Test message"
+
+
+# ============================================================================
+# Output Format Tests
+# ============================================================================
+
+
+class TestOutputFormats:
+    """Tests for output format functionality."""
+
+    def test_output_format_constants(self):
+        """Test that output format constants are defined."""
+        assert OutputFormat.JSON == "json"
+        assert OutputFormat.JSONL == "jsonl"
+        assert OutputFormat.CSV == "csv"
+        assert OutputFormat.TEXT == "text"
+
+    def test_flatten_dict_simple(self):
+        """Test flattening a simple dict."""
+        data = {"a": 1, "b": "hello"}
+        result = _flatten_dict(data)
+        assert result == {"a": 1, "b": "hello"}
+
+    def test_flatten_dict_nested(self):
+        """Test flattening a nested dict."""
+        data = {"outer": {"inner": "value", "num": 42}}
+        result = _flatten_dict(data)
+        assert result == {"outer.inner": "value", "outer.num": 42}
+
+    def test_flatten_dict_with_list(self):
+        """Test flattening a dict with list values."""
+        data = {"items": [1, 2, 3], "name": "test"}
+        result = _flatten_dict(data)
+        assert result["name"] == "test"
+        assert result["items"] == "[1, 2, 3]"
+
+    def test_extract_records_from_list(self):
+        """Test extracting records from a list."""
+        data = [{"id": 1}, {"id": 2}]
+        result = _extract_records(data)
+        assert result == data
+
+    def test_extract_records_from_dict_with_accounts(self):
+        """Test extracting records from accounts response."""
+        data = {"accounts": [{"id": "acc1"}, {"id": "acc2"}]}
+        result = _extract_records(data)
+        assert result == [{"id": "acc1"}, {"id": "acc2"}]
+
+    def test_extract_records_from_nested_results(self):
+        """Test extracting records from nested allTransactions.results."""
+        data = {"allTransactions": {"totalCount": 2, "results": [{"id": "tx1"}, {"id": "tx2"}]}}
+        result = _extract_records(data)
+        assert result == [{"id": "tx1"}, {"id": "tx2"}]
+
+    def test_extract_records_single_dict(self):
+        """Test extracting records from a single dict."""
+        data = {"id": "single", "name": "test"}
+        result = _extract_records(data)
+        assert result == [{"id": "single", "name": "test"}]
+
+    def test_output_jsonl(self, capsys):
+        """Test JSONL output format."""
+        data = {"accounts": [{"id": "1", "name": "Checking"}, {"id": "2", "name": "Savings"}]}
+        output_jsonl(data)
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert len(lines) == 2
+        assert json.loads(lines[0]) == {"id": "1", "name": "Checking"}
+        assert json.loads(lines[1]) == {"id": "2", "name": "Savings"}
+
+    def test_output_csv(self, capsys):
+        """Test CSV output format."""
+        data = {"accounts": [{"id": "1", "name": "Checking"}, {"id": "2", "name": "Savings"}]}
+        output_csv(data)
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert "id" in lines[0]
+        assert "name" in lines[0]
+        assert "1" in lines[1] or "2" in lines[1]
+
+    def test_output_csv_empty(self, capsys):
+        """Test CSV output with empty data."""
+        data = {"accounts": []}
+        output_csv(data)
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_output_text(self, capsys):
+        """Test text output format."""
+        data = {"accounts": [{"id": "1", "name": "Checking"}]}
+        output_text(data)
+        captured = capsys.readouterr()
+        assert "id=1" in captured.out
+        assert "name=Checking" in captured.out
+
+    def test_output_text_multiple_records(self, capsys):
+        """Test text output with multiple records."""
+        data = {"accounts": [{"id": "1"}, {"id": "2"}]}
+        output_text(data)
+        captured = capsys.readouterr()
+        assert "---" in captured.out  # Record separator
+        assert captured.out.count("id=") == 2
+
+    def test_output_data_json(self, capsys):
+        """Test output_data with JSON format."""
+        data = {"key": "value"}
+        output_data(data, OutputFormat.JSON)
+        captured = capsys.readouterr()
+        assert json.loads(captured.out) == {"key": "value"}
+
+    def test_output_data_jsonl(self, capsys):
+        """Test output_data with JSONL format."""
+        data = {"accounts": [{"a": 1}, {"a": 2}]}
+        output_data(data, OutputFormat.JSONL)
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert len(lines) == 2
+
+    def test_output_data_csv(self, capsys):
+        """Test output_data with CSV format."""
+        data = {"accounts": [{"col1": "val1", "col2": "val2"}]}
+        output_data(data, OutputFormat.CSV)
+        captured = capsys.readouterr()
+        assert "col1" in captured.out
+        assert "val1" in captured.out
+
+    def test_output_data_text(self, capsys):
+        """Test output_data with text format."""
+        data = {"accounts": [{"key": "value"}]}
+        output_data(data, OutputFormat.TEXT)
+        captured = capsys.readouterr()
+        assert "key=value" in captured.out
+
+
+class TestOutputFormatCLIOption:
+    """Tests for --format CLI option."""
+
+    def test_format_option_json(self, runner):
+        """Test --format json option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1", "name": "Test"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "json", "accounts", "list"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.output)
+            assert "accounts" in output
+
+    def test_format_option_jsonl(self, runner):
+        """Test --format jsonl option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1"}, {"id": "2"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "jsonl", "accounts", "list"])
+
+            assert result.exit_code == 0
+            lines = result.output.strip().split("\n")
+            assert len(lines) == 2
+            assert json.loads(lines[0])["id"] == "1"
+            assert json.loads(lines[1])["id"] == "2"
+
+    def test_format_option_csv(self, runner):
+        """Test --format csv option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1", "name": "Checking"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "csv", "accounts", "list"])
+
+            assert result.exit_code == 0
+            assert "id" in result.output
+            assert "name" in result.output
+            assert "Checking" in result.output
+
+    def test_format_option_text(self, runner):
+        """Test --format text option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1", "name": "Test"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "text", "accounts", "list"])
+
+            assert result.exit_code == 0
+            assert "id=1" in result.output
+            assert "name=Test" in result.output
+
+    def test_format_option_short_flag(self, runner):
+        """Test -f short flag for format."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["-f", "jsonl", "accounts", "list"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.output.strip())["id"] == "1"
+
+    def test_format_option_invalid(self, runner):
+        """Test invalid format option."""
+        result = runner.invoke(cli, ["--format", "invalid", "accounts", "list"])
+
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output or "invalid" in result.output.lower()

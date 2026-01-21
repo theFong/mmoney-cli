@@ -2,16 +2,19 @@
 """Monarch Money CLI - Command line interface for the Monarch Money API."""
 
 import asyncio
+import csv
 import functools
+import io
 import json
 import sys
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 
 import click
 
-# Context key for mutation mode
+# Context keys
 _ALLOW_MUTATIONS = "allow_mutations"
+_OUTPUT_FORMAT = "output_format"
 
 from monarchmoney import MonarchMoney
 
@@ -98,12 +101,144 @@ def output_error(code: str, message: str, details: str = None, exit_code: int = 
     sys.exit(exit_code)
 
 
+# ============================================================================
+# Output Formats
+# ============================================================================
+
+
+class OutputFormat:
+    """Available output formats."""
+    JSON = "json"
+    JSONL = "jsonl"
+    CSV = "csv"
+    TEXT = "text"
+
+
+def _flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
+    """Flatten nested dictionary for CSV/text output."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(_flatten_dict(v, new_key, sep).items())
+        elif isinstance(v, list):
+            # Convert list to string representation
+            items.append((new_key, json.dumps(v, default=str) if v else ""))
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def _extract_records(data: Any, key_hint: str = None) -> List[Dict]:
+    """Extract a list of records from API response for tabular output.
+
+    Handles common API response patterns:
+    - {"accounts": [...]} -> [...]
+    - {"allTransactions": {"results": [...]}} -> [...]
+    - {...} -> [{...}]
+    """
+    if isinstance(data, list):
+        return data
+
+    if isinstance(data, dict):
+        # Try common keys that contain record lists
+        list_keys = [
+            "accounts", "results", "transactions", "categories",
+            "householdTransactionTags", "credentials", "budgetData",
+            "recurringTransactions", "splits", "snapshots", "history"
+        ]
+
+        # Check for nested results (e.g., allTransactions.results)
+        for key, value in data.items():
+            if isinstance(value, dict) and "results" in value:
+                return value["results"]
+            if key in list_keys and isinstance(value, list):
+                return value
+
+        # Single record - wrap in list
+        return [data]
+
+    return []
+
+
 def output_json(data, pretty=True):
     """Output data as JSON."""
     if pretty:
         click.echo(json.dumps(data, indent=2, default=str))
     else:
         click.echo(json.dumps(data, default=str))
+
+
+def output_jsonl(data: Any):
+    """Output data as JSON Lines (one JSON object per line).
+
+    Good for streaming and line-by-line processing.
+    """
+    records = _extract_records(data)
+    for record in records:
+        click.echo(json.dumps(record, default=str))
+
+
+def output_csv(data: Any):
+    """Output data as CSV.
+
+    Good for tabular data like transactions and accounts.
+    """
+    records = _extract_records(data)
+    if not records:
+        return
+
+    # Flatten all records to get all possible keys
+    flattened = [_flatten_dict(r) if isinstance(r, dict) else {"value": r} for r in records]
+
+    # Collect all keys from all records
+    all_keys = set()
+    for record in flattened:
+        all_keys.update(record.keys())
+    fieldnames = sorted(all_keys)
+
+    # Write CSV
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for record in flattened:
+        writer.writerow({k: str(v) if v is not None else "" for k, v in record.items()})
+
+    click.echo(output.getvalue().rstrip())
+
+
+def output_text(data: Any):
+    """Output data as simple key=value text.
+
+    Good for grep/awk and simple extraction.
+    """
+    records = _extract_records(data)
+    for i, record in enumerate(records):
+        if i > 0:
+            click.echo("---")  # Record separator
+        if isinstance(record, dict):
+            flat = _flatten_dict(record)
+            for key, value in sorted(flat.items()):
+                click.echo(f"{key}={value if value is not None else ''}")
+        else:
+            click.echo(str(record))
+
+
+def output_data(data: Any, format: str = OutputFormat.JSON):
+    """Output data in the specified format.
+
+    Args:
+        data: Data to output (usually API response dict)
+        format: Output format (json, jsonl, csv, text)
+    """
+    if format == OutputFormat.JSONL:
+        output_jsonl(data)
+    elif format == OutputFormat.CSV:
+        output_csv(data)
+    elif format == OutputFormat.TEXT:
+        output_text(data)
+    else:
+        output_json(data)
 
 
 def run_async(coro):
@@ -119,6 +254,21 @@ def get_client():
     except Exception:
         pass
     return mm
+
+
+def get_output_format() -> str:
+    """Get the output format from the current Click context."""
+    ctx = click.get_current_context()
+    # Walk up to root context to get format
+    root = ctx
+    while root.parent:
+        root = root.parent
+    return (root.obj or {}).get(_OUTPUT_FORMAT, OutputFormat.JSON)
+
+
+def output_result(data: Any):
+    """Output result in the format specified by --format option."""
+    output_data(data, get_output_format())
 
 
 def require_mutations(f):
@@ -158,17 +308,31 @@ def require_mutations(f):
     default=False,
     help="Enable commands that modify data (create, update, delete). Default: read-only.",
 )
+@click.option(
+    "--format", "-f",
+    type=click.Choice(["json", "jsonl", "csv", "text"]),
+    default="json",
+    help="Output format: json (default), jsonl (streaming), csv (tabular), text (key=value).",
+)
 @click.pass_context
-def cli(ctx, allow_mutations):
+def cli(ctx, allow_mutations, format):
     """Monarch Money CLI - Access your financial data from the command line.
 
     Built on top of the monarchmoneycommunity library.
 
     By default, runs in READ-ONLY mode for safety (ideal for AI agents).
     Use --allow-mutations to enable commands that modify data.
+
+    \b
+    OUTPUT FORMATS:
+    - json: Pretty-printed JSON (default, backward compatible)
+    - jsonl: One JSON object per line (streaming, line processing)
+    - csv: Comma-separated values (tabular data, spreadsheets)
+    - text: Key=value pairs (simple extraction, grep/awk)
     """
     ctx.ensure_object(dict)
     ctx.obj[_ALLOW_MUTATIONS] = allow_mutations
+    ctx.obj[_OUTPUT_FORMAT] = format
 
 
 # ============================================================================
@@ -328,7 +492,7 @@ def accounts_list():
     """List all accounts."""
     mm = get_client()
     result = run_async(mm.get_accounts())
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("types")
@@ -336,7 +500,7 @@ def accounts_types():
     """List available account types."""
     mm = get_client()
     result = run_async(mm.get_account_type_options())
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("create")
@@ -360,7 +524,7 @@ def accounts_create(name, account_type, subtype, balance, in_net_worth):
             account_balance=balance,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("update")
@@ -397,7 +561,7 @@ def accounts_update(
             hide_transactions_from_reports=hide_transactions,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("delete")
@@ -408,7 +572,7 @@ def accounts_delete(account_id):
     """Delete an account."""
     mm = get_client()
     result = run_async(mm.delete_account(account_id))
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("refresh")
@@ -459,7 +623,7 @@ def holdings_list(account_id):
     """List holdings for an account."""
     mm = get_client()
     result = run_async(mm.get_account_holdings(int(account_id)))
-    output_json(result)
+    output_result(result)
 
 
 @holdings.command("history")
@@ -468,7 +632,7 @@ def holdings_history(account_id):
     """Get account balance history."""
     mm = get_client()
     result = run_async(mm.get_account_history(int(account_id)))
-    output_json(result)
+    output_result(result)
 
 
 @holdings.command("snapshots")
@@ -487,7 +651,7 @@ def holdings_snapshots(start_date, end_date, account_type):
             start_date=start, end_date=end, account_type=account_type
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @holdings.command("balances")
@@ -496,7 +660,7 @@ def holdings_balances(start_date):
     """Get recent account balances."""
     mm = get_client()
     result = run_async(mm.get_recent_account_balances(start_date=start_date))
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -555,7 +719,7 @@ def transactions_list(
             is_recurring=is_recurring,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("get")
@@ -564,7 +728,7 @@ def transactions_get(transaction_id):
     """Get transaction details."""
     mm = get_client()
     result = run_async(mm.get_transaction_details(transaction_id))
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("summary")
@@ -572,7 +736,7 @@ def transactions_summary():
     """Get transactions summary."""
     mm = get_client()
     result = run_async(mm.get_transactions_summary())
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("splits")
@@ -581,7 +745,7 @@ def transactions_splits(transaction_id):
     """Get transaction splits."""
     mm = get_client()
     result = run_async(mm.get_transaction_splits(transaction_id))
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("create")
@@ -613,7 +777,7 @@ def transactions_create(
             update_balance=update_balance,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("update")
@@ -650,7 +814,7 @@ def transactions_update(
             needs_review=needs_review,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("delete")
@@ -680,7 +844,7 @@ def categories_list():
     """List all categories."""
     mm = get_client()
     result = run_async(mm.get_transaction_categories())
-    output_json(result)
+    output_result(result)
 
 
 @categories.command("groups")
@@ -688,7 +852,7 @@ def categories_groups():
     """List category groups."""
     mm = get_client()
     result = run_async(mm.get_transaction_category_groups())
-    output_json(result)
+    output_result(result)
 
 
 @categories.command("create")
@@ -708,7 +872,7 @@ def categories_create(group_id, name, icon, rollover):
             rollover_enabled=rollover,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @categories.command("delete")
@@ -738,7 +902,7 @@ def tags_list():
     """List all tags."""
     mm = get_client()
     result = run_async(mm.get_transaction_tags())
-    output_json(result)
+    output_result(result)
 
 
 @tags.command("create")
@@ -749,7 +913,7 @@ def tags_create(name, color):
     """Create a tag."""
     mm = get_client()
     result = run_async(mm.create_transaction_tag(name=name, color=color))
-    output_json(result)
+    output_result(result)
 
 
 @tags.command("set")
@@ -762,7 +926,7 @@ def tags_set(transaction_id, tag_id):
     result = run_async(
         mm.set_transaction_tags(transaction_id=transaction_id, tag_ids=list(tag_id))
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -783,7 +947,7 @@ def budgets_list(start_date, end_date):
     """List budgets."""
     mm = get_client()
     result = run_async(mm.get_budgets(start_date=start_date, end_date=end_date))
-    output_json(result)
+    output_result(result)
 
 
 @budgets.command("set")
@@ -813,7 +977,7 @@ def budgets_set(
             apply_to_future=apply_to_future,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -837,7 +1001,7 @@ def cashflow_summary(start_date, end_date, limit):
     result = run_async(
         mm.get_cashflow_summary(limit=limit, start_date=start_date, end_date=end_date)
     )
-    output_json(result)
+    output_result(result)
 
 
 @cashflow.command("details")
@@ -850,7 +1014,7 @@ def cashflow_details(start_date, end_date, limit):
     result = run_async(
         mm.get_cashflow(limit=limit, start_date=start_date, end_date=end_date)
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -873,7 +1037,7 @@ def recurring_list(start_date, end_date):
     result = run_async(
         mm.get_recurring_transactions(start_date=start_date, end_date=end_date)
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -892,7 +1056,7 @@ def institutions_list():
     """List linked institutions."""
     mm = get_client()
     result = run_async(mm.get_institutions())
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -911,7 +1075,7 @@ def subscription_status():
     """Get subscription details."""
     mm = get_client()
     result = run_async(mm.get_subscription_details())
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
