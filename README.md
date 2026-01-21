@@ -31,13 +31,23 @@ pip install mmoney
 ## Development
 
 ```bash
-# Clone and install with uv
+# Clone the repo
 git clone https://github.com/theFong/mmoney-cli.git
 cd mmoney-cli
-uv sync
 
-# Run CLI
-uv run mmoney --help
+# Full setup (installs uv, deps, git hooks)
+./scripts/setup-dev.sh
+
+# Or use VS Code devcontainer (recommended)
+# Open in VS Code and click "Reopen in Container"
+```
+
+**Quick commands:**
+```bash
+uv run mmoney --help        # Run the CLI
+uv run pytest tests/        # Run tests
+./scripts/setup-dev.sh lint # Run all linters
+./scripts/setup-dev.sh test # Run tests
 ```
 
 ## Quick Start
