@@ -5,7 +5,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from click.testing import CliRunner
 
-from mmoney_cli.cli import cli, output_json, get_client, run_async
+from mmoney_cli.cli import (
+    cli, output_json, output_jsonl, output_csv, output_text, output_data, output_error,
+    get_client, run_async, ExitCode, ErrorCode, OutputFormat, _flatten_dict, _extract_records
+)
 
 
 @pytest.fixture
@@ -36,9 +39,11 @@ class TestAuthErrors:
                 ["auth", "login", "--no-interactive", "-e", "bad@email.com", "-p", "wrongpass"],
             )
 
-            assert result.exit_code == 1
-            assert "Login failed" in result.output
-            assert "Invalid email or password" in result.output
+            assert result.exit_code == 2  # AUTH_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "AUTH_FAILED"
+            assert "Login failed" in error["error"]["message"]
+            assert "Invalid email or password" in error["error"]["details"]
 
     def test_login_mfa_wrong_code(self, runner):
         """Test login with wrong MFA code."""
@@ -54,8 +59,10 @@ class TestAuthErrors:
                 ["auth", "login", "--mfa-code", "000000", "-e", "test@example.com", "-p", "pass"],
             )
 
-            assert result.exit_code == 1
-            assert "MFA login failed" in result.output
+            assert result.exit_code == 2  # AUTH_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "AUTH_MFA_FAILED"
+            assert "MFA login failed" in error["error"]["message"]
 
     def test_login_with_mfa_secret(self, runner):
         """Test login with MFA secret (TOTP)."""
@@ -96,8 +103,10 @@ class TestAuthErrors:
                 ["auth", "login", "--no-interactive", "-e", "test@example.com", "-p", "pass"],
             )
 
-            assert result.exit_code == 1
-            assert "Login failed" in result.output
+            assert result.exit_code == 2  # AUTH_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "AUTH_FAILED"
+            assert "Login failed" in error["error"]["message"]
 
     def test_auth_status_no_token(self, runner):
         """Test auth status when session exists but no token."""
@@ -235,7 +244,7 @@ class TestEdgeCases:
             mm_instance.get_accounts = AsyncMock(return_value={"accounts": []})
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "list"])
+            result = runner.invoke(cli, ["-f", "json", "accounts", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -250,7 +259,7 @@ class TestEdgeCases:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "list"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -263,7 +272,7 @@ class TestEdgeCases:
             mm_instance.get_transaction_categories = AsyncMock(return_value={"categories": []})
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "list"])
+            result = runner.invoke(cli, ["-f", "json", "categories", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -278,7 +287,7 @@ class TestEdgeCases:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["tags", "list"])
+            result = runner.invoke(cli, ["-f", "json", "tags", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -345,6 +354,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "accounts", "create",
                     "--name", "Test Account",
                     "--type", "depository",
@@ -373,6 +383,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "transactions", "update", "txn_001",
                     "--category-id", "cat_001",
                     "--merchant", "New Merchant",
@@ -440,6 +451,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "budgets", "set",
                     "--amount", "1000",
                     "--category-id", "cat_001",
@@ -466,6 +478,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "categories", "create",
                     "--group-id", "grp_001",
                     "--name", "New Category",
@@ -485,7 +498,7 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "delete", "123"], input="n\n")
+            result = runner.invoke(cli, ["--allow-mutations", "accounts", "delete", "123"], input="n\n")
 
             assert result.exit_code == 1
             mm_instance.delete_account.assert_not_called()
@@ -496,7 +509,7 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "delete", "txn_001"], input="n\n")
+            result = runner.invoke(cli, ["--allow-mutations", "transactions", "delete", "txn_001"], input="n\n")
 
             assert result.exit_code == 1
             mm_instance.delete_transaction.assert_not_called()
@@ -507,7 +520,7 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "delete", "cat_001"], input="n\n")
+            result = runner.invoke(cli, ["--allow-mutations", "categories", "delete", "cat_001"], input="n\n")
 
             assert result.exit_code == 1
             mm_instance.delete_transaction_category.assert_not_called()
@@ -602,7 +615,7 @@ class TestSpecialResponses:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "list"])
+            result = runner.invoke(cli, ["-f", "json", "accounts", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -620,7 +633,7 @@ class TestSpecialResponses:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "list", "--limit", "1000"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "list", "--limit", "1000"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -663,3 +676,465 @@ class TestSpecialResponses:
             assert result.exit_code == 0
             call_kwargs = mm_instance.get_aggregate_snapshots.call_args[1]
             assert call_kwargs["account_type"] == "investment"
+
+
+# ============================================================================
+# Read-Only Mode Tests
+# ============================================================================
+
+
+class TestReadOnlyMode:
+    """Tests for read-only safe mode."""
+
+    def test_accounts_create_blocked_without_flag(self, runner):
+        """Test accounts create is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            [
+                "accounts", "create",
+                "--name", "Test Account",
+                "--type", "depository",
+                "--subtype", "checking",
+                "--balance", "1000",
+            ],
+        )
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+        assert "This command modifies data" in error["error"]["message"]
+        assert "--allow-mutations" in error["error"]["details"]
+
+    def test_accounts_update_blocked_without_flag(self, runner):
+        """Test accounts update is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["accounts", "update", "123", "--name", "New Name"])
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_accounts_delete_blocked_without_flag(self, runner):
+        """Test accounts delete is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["accounts", "delete", "123", "--yes"])
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_transactions_create_blocked_without_flag(self, runner):
+        """Test transactions create is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            [
+                "transactions", "create",
+                "--date", "2024-01-15",
+                "--account-id", "123",
+                "--amount", "-50.00",
+                "--merchant", "Test",
+                "--category-id", "cat_001",
+            ],
+        )
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_transactions_update_blocked_without_flag(self, runner):
+        """Test transactions update is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["transactions", "update", "txn_001", "--merchant", "New Merchant"],
+        )
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_transactions_delete_blocked_without_flag(self, runner):
+        """Test transactions delete is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["transactions", "delete", "txn_001", "--yes"])
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_categories_create_blocked_without_flag(self, runner):
+        """Test categories create is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["categories", "create", "--group-id", "grp_001", "--name", "New Category"],
+        )
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_categories_delete_blocked_without_flag(self, runner):
+        """Test categories delete is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["categories", "delete", "cat_001", "--yes"])
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_tags_create_blocked_without_flag(self, runner):
+        """Test tags create is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["tags", "create", "--name", "New Tag"])
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_tags_set_blocked_without_flag(self, runner):
+        """Test tags set is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["tags", "set", "txn_001", "--tag-id", "tag_001"],
+        )
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_budgets_set_blocked_without_flag(self, runner):
+        """Test budgets set is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["budgets", "set", "--amount", "500", "--category-id", "cat_001"],
+        )
+
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+
+    def test_read_commands_work_without_flag(self, runner):
+        """Test that read-only commands work without --allow-mutations."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(return_value={"accounts": []})
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["accounts", "list"])
+
+            assert result.exit_code == 0
+
+
+# ============================================================================
+# Exit Codes and Error Codes Tests
+# ============================================================================
+
+
+class TestExitCodes:
+    """Tests for exit code constants."""
+
+    def test_exit_codes_defined(self):
+        """Test that all exit codes are defined."""
+        assert ExitCode.SUCCESS == 0
+        assert ExitCode.GENERAL_ERROR == 1
+        assert ExitCode.AUTH_ERROR == 2
+        assert ExitCode.NOT_FOUND == 3
+        assert ExitCode.VALIDATION_ERROR == 4
+        assert ExitCode.API_ERROR == 5
+        assert ExitCode.MUTATION_BLOCKED == 6
+
+    def test_exit_codes_unique(self):
+        """Test that exit codes are unique."""
+        codes = [
+            ExitCode.SUCCESS,
+            ExitCode.GENERAL_ERROR,
+            ExitCode.AUTH_ERROR,
+            ExitCode.NOT_FOUND,
+            ExitCode.VALIDATION_ERROR,
+            ExitCode.API_ERROR,
+            ExitCode.MUTATION_BLOCKED,
+        ]
+        assert len(codes) == len(set(codes))
+
+
+class TestErrorCodes:
+    """Tests for error code constants."""
+
+    def test_auth_error_codes_defined(self):
+        """Test that auth error codes are defined."""
+        assert ErrorCode.AUTH_REQUIRED == "AUTH_REQUIRED"
+        assert ErrorCode.AUTH_FAILED == "AUTH_FAILED"
+        assert ErrorCode.AUTH_MFA_REQUIRED == "AUTH_MFA_REQUIRED"
+        assert ErrorCode.AUTH_MFA_FAILED == "AUTH_MFA_FAILED"
+        assert ErrorCode.AUTH_INVALID_TOKEN == "AUTH_INVALID_TOKEN"
+
+    def test_validation_error_codes_defined(self):
+        """Test that validation error codes are defined."""
+        assert ErrorCode.VALIDATION_MISSING_FIELD == "VALIDATION_MISSING_FIELD"
+        assert ErrorCode.VALIDATION_INVALID_VALUE == "VALIDATION_INVALID_VALUE"
+        assert ErrorCode.VALIDATION_INVALID_DATE == "VALIDATION_INVALID_DATE"
+
+    def test_api_error_codes_defined(self):
+        """Test that API error codes are defined."""
+        assert ErrorCode.API_ERROR == "API_ERROR"
+        assert ErrorCode.API_TIMEOUT == "API_TIMEOUT"
+        assert ErrorCode.API_RATE_LIMIT == "API_RATE_LIMIT"
+
+    def test_resource_error_codes_defined(self):
+        """Test that resource error codes are defined."""
+        assert ErrorCode.NOT_FOUND == "NOT_FOUND"
+        assert ErrorCode.ALREADY_EXISTS == "ALREADY_EXISTS"
+
+    def test_permission_error_codes_defined(self):
+        """Test that permission error codes are defined."""
+        assert ErrorCode.MUTATION_BLOCKED == "MUTATION_BLOCKED"
+
+
+class TestOutputError:
+    """Tests for the output_error function."""
+
+    def test_output_error_format(self, capsys):
+        """Test that output_error produces correct JSON format."""
+        with pytest.raises(SystemExit) as excinfo:
+            output_error(
+                code="TEST_ERROR",
+                message="Test message",
+                details="Test details",
+                exit_code=42,
+            )
+
+        assert excinfo.value.code == 42
+        captured = capsys.readouterr()
+        error = json.loads(captured.err)
+        assert error["error"]["code"] == "TEST_ERROR"
+        assert error["error"]["message"] == "Test message"
+        assert error["error"]["details"] == "Test details"
+
+    def test_output_error_without_details(self, capsys):
+        """Test output_error without details."""
+        with pytest.raises(SystemExit):
+            output_error(
+                code="TEST_ERROR",
+                message="Test message",
+                exit_code=1,
+            )
+
+        captured = capsys.readouterr()
+        error = json.loads(captured.err)
+        assert "details" not in error["error"]
+        assert error["error"]["code"] == "TEST_ERROR"
+        assert error["error"]["message"] == "Test message"
+
+
+# ============================================================================
+# Output Format Tests
+# ============================================================================
+
+
+class TestOutputFormats:
+    """Tests for output format functionality."""
+
+    def test_output_format_constants(self):
+        """Test that output format constants are defined."""
+        assert OutputFormat.JSON == "json"
+        assert OutputFormat.JSONL == "jsonl"
+        assert OutputFormat.CSV == "csv"
+        assert OutputFormat.TEXT == "text"
+
+    def test_flatten_dict_simple(self):
+        """Test flattening a simple dict."""
+        data = {"a": 1, "b": "hello"}
+        result = _flatten_dict(data)
+        assert result == {"a": 1, "b": "hello"}
+
+    def test_flatten_dict_nested(self):
+        """Test flattening a nested dict."""
+        data = {"outer": {"inner": "value", "num": 42}}
+        result = _flatten_dict(data)
+        assert result == {"outer.inner": "value", "outer.num": 42}
+
+    def test_flatten_dict_with_list(self):
+        """Test flattening a dict with list values."""
+        data = {"items": [1, 2, 3], "name": "test"}
+        result = _flatten_dict(data)
+        assert result["name"] == "test"
+        assert result["items"] == "[1, 2, 3]"
+
+    def test_extract_records_from_list(self):
+        """Test extracting records from a list."""
+        data = [{"id": 1}, {"id": 2}]
+        result = _extract_records(data)
+        assert result == data
+
+    def test_extract_records_from_dict_with_accounts(self):
+        """Test extracting records from accounts response."""
+        data = {"accounts": [{"id": "acc1"}, {"id": "acc2"}]}
+        result = _extract_records(data)
+        assert result == [{"id": "acc1"}, {"id": "acc2"}]
+
+    def test_extract_records_from_nested_results(self):
+        """Test extracting records from nested allTransactions.results."""
+        data = {"allTransactions": {"totalCount": 2, "results": [{"id": "tx1"}, {"id": "tx2"}]}}
+        result = _extract_records(data)
+        assert result == [{"id": "tx1"}, {"id": "tx2"}]
+
+    def test_extract_records_single_dict(self):
+        """Test extracting records from a single dict."""
+        data = {"id": "single", "name": "test"}
+        result = _extract_records(data)
+        assert result == [{"id": "single", "name": "test"}]
+
+    def test_output_jsonl(self, capsys):
+        """Test JSONL output format."""
+        data = {"accounts": [{"id": "1", "name": "Checking"}, {"id": "2", "name": "Savings"}]}
+        output_jsonl(data)
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert len(lines) == 2
+        assert json.loads(lines[0]) == {"id": "1", "name": "Checking"}
+        assert json.loads(lines[1]) == {"id": "2", "name": "Savings"}
+
+    def test_output_csv(self, capsys):
+        """Test CSV output format."""
+        data = {"accounts": [{"id": "1", "name": "Checking"}, {"id": "2", "name": "Savings"}]}
+        output_csv(data)
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert "id" in lines[0]
+        assert "name" in lines[0]
+        assert "1" in lines[1] or "2" in lines[1]
+
+    def test_output_csv_empty(self, capsys):
+        """Test CSV output with empty data."""
+        data = {"accounts": []}
+        output_csv(data)
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_output_text(self, capsys):
+        """Test text output format."""
+        data = {"accounts": [{"id": "1", "name": "Checking"}]}
+        output_text(data)
+        captured = capsys.readouterr()
+        assert "id=1" in captured.out
+        assert "name=Checking" in captured.out
+
+    def test_output_text_multiple_records(self, capsys):
+        """Test text output with multiple records."""
+        data = {"accounts": [{"id": "1"}, {"id": "2"}]}
+        output_text(data)
+        captured = capsys.readouterr()
+        assert "---" in captured.out  # Record separator
+        assert captured.out.count("id=") == 2
+
+    def test_output_data_json(self, capsys):
+        """Test output_data with JSON format."""
+        data = {"key": "value"}
+        output_data(data, OutputFormat.JSON)
+        captured = capsys.readouterr()
+        assert json.loads(captured.out) == {"key": "value"}
+
+    def test_output_data_jsonl(self, capsys):
+        """Test output_data with JSONL format."""
+        data = {"accounts": [{"a": 1}, {"a": 2}]}
+        output_data(data, OutputFormat.JSONL)
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert len(lines) == 2
+
+    def test_output_data_csv(self, capsys):
+        """Test output_data with CSV format."""
+        data = {"accounts": [{"col1": "val1", "col2": "val2"}]}
+        output_data(data, OutputFormat.CSV)
+        captured = capsys.readouterr()
+        assert "col1" in captured.out
+        assert "val1" in captured.out
+
+    def test_output_data_text(self, capsys):
+        """Test output_data with text format."""
+        data = {"accounts": [{"key": "value"}]}
+        output_data(data, OutputFormat.TEXT)
+        captured = capsys.readouterr()
+        assert "key=value" in captured.out
+
+
+class TestOutputFormatCLIOption:
+    """Tests for --format CLI option."""
+
+    def test_format_option_json(self, runner):
+        """Test --format json option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1", "name": "Test"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "json", "accounts", "list"])
+
+            assert result.exit_code == 0
+            output = json.loads(result.output)
+            assert "accounts" in output
+
+    def test_format_option_jsonl(self, runner):
+        """Test --format jsonl option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1"}, {"id": "2"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "jsonl", "accounts", "list"])
+
+            assert result.exit_code == 0
+            lines = result.output.strip().split("\n")
+            assert len(lines) == 2
+            assert json.loads(lines[0])["id"] == "1"
+            assert json.loads(lines[1])["id"] == "2"
+
+    def test_format_option_csv(self, runner):
+        """Test --format csv option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1", "name": "Checking"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "csv", "accounts", "list"])
+
+            assert result.exit_code == 0
+            assert "id" in result.output
+            assert "name" in result.output
+            assert "Checking" in result.output
+
+    def test_format_option_text(self, runner):
+        """Test --format text option."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1", "name": "Test"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["--format", "text", "accounts", "list"])
+
+            assert result.exit_code == 0
+            assert "id=1" in result.output
+            assert "name=Test" in result.output
+
+    def test_format_option_short_flag(self, runner):
+        """Test -f short flag for format."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(
+                return_value={"accounts": [{"id": "1"}]}
+            )
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["-f", "jsonl", "accounts", "list"])
+
+            assert result.exit_code == 0
+            assert json.loads(result.output.strip())["id"] == "1"
+
+    def test_format_option_invalid(self, runner):
+        """Test invalid format option."""
+        result = runner.invoke(cli, ["--format", "invalid", "accounts", "list"])
+
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output or "invalid" in result.output.lower()
