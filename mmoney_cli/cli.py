@@ -326,6 +326,7 @@ def get_client():
     token = load_token_from_keychain()
     if token:
         mm.set_token(token)
+        mm._headers["Authorization"] = f"Token {token}"
         return mm
 
     # Fall back to pickle file
