@@ -25,6 +25,7 @@ Understanding effort and file changes helps parallelize work and avoid merge con
 | [#3](https://github.com/theFong/mmoney-cli/issues/3) | Dead code linting | S | `pyproject.toml`, `.github/workflows/ci.yml` |
 | [#4](https://github.com/theFong/mmoney-cli/issues/4) | Lint rules | S-M | `pyproject.toml`, `.github/workflows/ci.yml` |
 | [#1](https://github.com/theFong/mmoney-cli/issues/1) | Publish to PyPI | S | `pyproject.toml`, `.github/workflows/publish.yml` |
+| [#20](https://github.com/theFong/mmoney-cli/issues/20) | Git hooks (lint, test, secrets) | S | `.pre-commit-config.yaml`, `.secrets.baseline`, `pyproject.toml` |
 
 #### Localized (Low conflict risk)
 
@@ -59,6 +60,7 @@ Phase 1 (Parallel - no code changes)
 ├── #17 Mock test data          [tests only]
 ├── #3  Dead code linting       [CI only]
 ├── #4  Lint rules              [CI only]
+├── #20 Git hooks               [config only]
 └── #1  PyPI setup              [config only]
 
 Phase 2 (Sequential - touches cli.py)
@@ -80,7 +82,7 @@ These can run simultaneously without conflicts:
 | Stream | Issues | Owner |
 |--------|--------|-------|
 | Documentation | #19, #13 | Agent A |
-| CI/CD | #3, #4, #1 | Agent B |
+| CI/CD | #3, #4, #20, #1 | Agent B |
 | Test Infrastructure | #17 | Agent C |
 | CLI Code | #15 → #6 → #8 → #9 → #7 | Agent D (sequential) |
 
@@ -110,6 +112,7 @@ These can run simultaneously without conflicts:
 ### 2. Code Quality (Parallel)
 - [ ] Dead code linting in CI (#3)
 - [ ] Lint rules enforced (#4)
+- [ ] Git hooks for lint, test, secrets (#20)
 - [ ] Realistic mock data for tests (#17)
 
 ### 3. CLI Improvements (Sequential)
