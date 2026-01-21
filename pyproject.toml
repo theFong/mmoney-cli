@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mmoney-cli"
+name = "mmoney"
 version = "0.1.0"
 description = "CLI for Monarch Money - access your financial data from the command line"
 readme = "README.md"

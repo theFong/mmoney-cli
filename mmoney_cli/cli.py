@@ -403,6 +403,9 @@ def require_mutations(f):
 def cli(ctx, allow_mutations, format):
     """Monarch Money CLI - Access your financial data from the command line.
 
+    DISCLAIMER: This is an unofficial, community-built tool. Not affiliated
+    with, endorsed by, or supported by Monarch Money. Use at your own risk.
+
     Built on top of the monarchmoneycommunity library.
 
     By default, runs in READ-ONLY mode for safety (ideal for AI agents).

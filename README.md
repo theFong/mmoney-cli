@@ -2,6 +2,8 @@
 
 ![CI](https://github.com/theFong/mmoney-cli/actions/workflows/ci.yml/badge.svg)
 
+> **Disclaimer:** This is an unofficial, community-built CLI tool. It is not affiliated with, endorsed by, or supported by Monarch Money. Use at your own risk.
+
 CLI for [Monarch Money](https://www.monarchmoney.com) - access your financial data from the command line.
 
 Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchmoneycommunity).

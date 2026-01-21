@@ -961,7 +961,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mmoney-cli"
+name = "mmoney"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
