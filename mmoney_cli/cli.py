@@ -140,9 +140,7 @@ class OutputFormat:
     TEXT = "text"
 
 
-def _flatten_dict(
-    d: dict[str, Any], parent_key: str = "", sep: str = "."
-) -> dict[str, Any]:
+def _flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = ".") -> dict[str, Any]:
     """Flatten nested dictionary for CSV/text output."""
     items: list[tuple[str, Any]] = []
     for k, v in d.items():
