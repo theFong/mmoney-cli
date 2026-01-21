@@ -113,27 +113,25 @@ class TestAuthCommands:
 
     def test_auth_logout(self, runner):
         """Test logout command."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
-            mm_instance = MagicMock()
-            MockMM.return_value = mm_instance
+        with patch("mmoney_cli.cli.delete_token_from_keychain") as mock_delete:
+            mock_delete.return_value = True
 
             result = runner.invoke(cli, ["auth", "logout"])
 
             assert result.exit_code == 0
             assert "Session deleted" in result.output
-            mm_instance.delete_session.assert_called_once()
+            mock_delete.assert_called_once()
 
     def test_auth_status_authenticated(self, runner):
-        """Test status command when authenticated."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
-            mm_instance = MagicMock()
-            mm_instance.token = "valid_token"
-            MockMM.return_value = mm_instance
+        """Test status command when authenticated via keychain."""
+        with patch("mmoney_cli.cli.load_token_from_keychain") as mock_load:
+            mock_load.return_value = "valid_token"
 
             result = runner.invoke(cli, ["auth", "status"])
 
             assert result.exit_code == 0
             assert "Authenticated" in result.output
+            assert "keychain" in result.output
 
     def test_auth_status_not_authenticated(self, runner):
         """Test status command when not authenticated."""

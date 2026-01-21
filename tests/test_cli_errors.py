@@ -559,10 +559,14 @@ class TestUtilityFunctions:
         assert "2024-01-15" in captured.out
 
     def test_get_client_loads_session(self):
-        """Test get_client loads session."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+        """Test get_client loads session from file when keychain is empty."""
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
+             patch("mmoney_cli.cli.load_token_from_keychain") as mock_keychain, \
+             patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file:
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
+            mock_keychain.return_value = None  # No keychain token
+            mock_session_file.exists.return_value = True  # File exists
 
             client = get_client()
 
@@ -1244,8 +1248,10 @@ class TestKeychainStorage:
     def test_get_client_falls_back_to_file(self):
         """Test get_client falls back to file when keychain empty."""
         with patch("mmoney_cli.cli.load_token_from_keychain") as mock_load, \
-             patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+             patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
+             patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file:
             mock_load.return_value = None
+            mock_session_file.exists.return_value = True  # File exists
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
 
@@ -1286,14 +1292,13 @@ class TestKeychainStorage:
 
     def test_auth_logout_clears_keychain(self, runner):
         """Test auth logout clears keychain."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
-             patch("mmoney_cli.cli.delete_token_from_keychain") as mock_delete:
-            mm_instance = MagicMock()
-            MockMM.return_value = mm_instance
+        with patch("mmoney_cli.cli.delete_token_from_keychain") as mock_delete, \
+             patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file:
             mock_delete.return_value = True
+            mock_session_file.exists.return_value = False  # No file to delete
 
             result = runner.invoke(cli, ["auth", "logout"])
 
             assert result.exit_code == 0
             mock_delete.assert_called_once()
-            mm_instance.delete_session.assert_called_once()
+            assert "Session deleted" in result.output
