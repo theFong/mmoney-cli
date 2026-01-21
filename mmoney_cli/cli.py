@@ -67,13 +67,19 @@ def auth():
 @click.option("--email", "-e", help="Email address")
 @click.option("--password", "-p", help="Password")
 @click.option("--mfa-secret", help="MFA secret key for automatic TOTP")
+@click.option("--mfa-code", help="One-time MFA code (6 digits)")
 @click.option("--token", "-t", help="Auth token from browser (bypasses captcha)")
 @click.option("--device-uuid", "-d", help="Device UUID from browser (bypasses MFA)")
 @click.option(
     "--interactive/--no-interactive", "-i", default=True, help="Use interactive login"
 )
-def auth_login(email, password, mfa_secret, token, device_uuid, interactive):
+def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, interactive):
     """Login to Monarch Money.
+
+    For MFA login with a one-time code:
+
+    \b
+    mmoney auth login --mfa-code 123456 -e email -p password
 
     For captcha-blocked logins, use --token with a token from your browser:
 
@@ -104,7 +110,25 @@ def auth_login(email, password, mfa_secret, token, device_uuid, interactive):
     if device_uuid:
         mm._headers["Device-UUID"] = device_uuid
 
-    if interactive:
+    if mfa_code:
+        # One-time MFA code login
+        if not email or not password:
+            click.echo(
+                "Error: --email and --password required with --mfa-code",
+                err=True,
+            )
+            sys.exit(1)
+        try:
+            run_async(
+                mm.multi_factor_authenticate(
+                    email=email, password=password, code=mfa_code
+                )
+            )
+            mm.save_session()
+        except Exception as e:
+            click.echo(f"MFA login failed: {e}", err=True)
+            sys.exit(1)
+    elif interactive:
         run_async(mm.interactive_login())
     else:
         if not email or not password:
