@@ -189,6 +189,7 @@ class TestAccountsCommands:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "accounts", "create",
                     "--name", "Test Account",
                     "--type", "depository",
@@ -210,7 +211,7 @@ class TestAccountsCommands:
 
             result = runner.invoke(
                 cli,
-                ["accounts", "update", "123", "--name", "Updated Name"],
+                ["--allow-mutations", "accounts", "update", "123", "--name", "Updated Name"],
             )
 
             assert result.exit_code == 0
@@ -224,7 +225,7 @@ class TestAccountsCommands:
             mm_instance.delete_account = AsyncMock(return_value=mock_result)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "delete", "123", "--yes"])
+            result = runner.invoke(cli, ["--allow-mutations", "accounts", "delete", "123", "--yes"])
 
             assert result.exit_code == 0
             mm_instance.delete_account.assert_called_once_with("123")
@@ -335,6 +336,7 @@ class TestTransactionsCommands:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "transactions", "create",
                     "--date", "2024-01-15",
                     "--account-id", "123",
@@ -357,7 +359,7 @@ class TestTransactionsCommands:
 
             result = runner.invoke(
                 cli,
-                ["transactions", "update", "txn_001", "--merchant", "New Merchant"],
+                ["--allow-mutations", "transactions", "update", "txn_001", "--merchant", "New Merchant"],
             )
 
             assert result.exit_code == 0
@@ -370,7 +372,7 @@ class TestTransactionsCommands:
             mm_instance.delete_transaction = AsyncMock(return_value=True)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "delete", "txn_001", "--yes"])
+            result = runner.invoke(cli, ["--allow-mutations", "transactions", "delete", "txn_001", "--yes"])
 
             assert result.exit_code == 0
             mm_instance.delete_transaction.assert_called_once_with("txn_001")
@@ -499,7 +501,7 @@ class TestCategoriesCommands:
 
             result = runner.invoke(
                 cli,
-                ["categories", "create", "--group-id", "grp_001", "--name", "New Category"],
+                ["--allow-mutations", "categories", "create", "--group-id", "grp_001", "--name", "New Category"],
             )
 
             assert result.exit_code == 0
@@ -512,7 +514,7 @@ class TestCategoriesCommands:
             mm_instance.delete_transaction_category = AsyncMock(return_value=True)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "delete", "cat_001", "--yes"])
+            result = runner.invoke(cli, ["--allow-mutations", "categories", "delete", "cat_001", "--yes"])
 
             assert result.exit_code == 0
             mm_instance.delete_transaction_category.assert_called_once_with("cat_001")
@@ -547,7 +549,7 @@ class TestTagsCommands:
             mm_instance.create_transaction_tag = AsyncMock(return_value=mock_result)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["tags", "create", "--name", "New Tag"])
+            result = runner.invoke(cli, ["--allow-mutations", "tags", "create", "--name", "New Tag"])
 
             assert result.exit_code == 0
             mm_instance.create_transaction_tag.assert_called_once()
@@ -562,7 +564,7 @@ class TestTagsCommands:
 
             result = runner.invoke(
                 cli,
-                ["tags", "set", "txn_001", "--tag-id", "tag_001", "--tag-id", "tag_002"],
+                ["--allow-mutations", "tags", "set", "txn_001", "--tag-id", "tag_001", "--tag-id", "tag_002"],
             )
 
             assert result.exit_code == 0
@@ -615,7 +617,7 @@ class TestBudgetsCommands:
 
             result = runner.invoke(
                 cli,
-                ["budgets", "set", "--amount", "500", "--category-id", "cat_001"],
+                ["--allow-mutations", "budgets", "set", "--amount", "500", "--category-id", "cat_001"],
             )
 
             assert result.exit_code == 0

@@ -2,12 +2,16 @@
 """Monarch Money CLI - Command line interface for the Monarch Money API."""
 
 import asyncio
+import functools
 import json
 import sys
 from datetime import date
 from typing import Optional, List
 
 import click
+
+# Context key for mutation mode
+_ALLOW_MUTATIONS = "allow_mutations"
 
 from monarchmoney import MonarchMoney
 
@@ -37,6 +41,30 @@ def get_client():
     return mm
 
 
+def require_mutations(f):
+    """Decorator that blocks mutation commands in read-only mode.
+
+    Apply this to any command that creates, updates, or deletes data.
+    Users must pass --allow-mutations to use these commands.
+    """
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        ctx = click.get_current_context()
+        # Walk up to root context to get allow_mutations flag
+        root = ctx
+        while root.parent:
+            root = root.parent
+        if not (root.obj or {}).get(_ALLOW_MUTATIONS, False):
+            click.echo(
+                "Error: This command modifies data. Use --allow-mutations to enable.\n"
+                "Example: mmoney --allow-mutations accounts create ...",
+                err=True,
+            )
+            sys.exit(1)
+        return f(*args, **kwargs)
+    return wrapper
+
+
 # ============================================================================
 # Main CLI Group
 # ============================================================================
@@ -44,12 +72,23 @@ def get_client():
 
 @click.group()
 @click.version_option(version=__version__, prog_name="mmoney")
-def cli():
+@click.option(
+    "--allow-mutations",
+    is_flag=True,
+    default=False,
+    help="Enable commands that modify data (create, update, delete). Default: read-only.",
+)
+@click.pass_context
+def cli(ctx, allow_mutations):
     """Monarch Money CLI - Access your financial data from the command line.
 
     Built on top of the monarchmoneycommunity library.
+
+    By default, runs in READ-ONLY mode for safety (ideal for AI agents).
+    Use --allow-mutations to enable commands that modify data.
     """
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj[_ALLOW_MUTATIONS] = allow_mutations
 
 
 # ============================================================================
@@ -218,6 +257,7 @@ def accounts_types():
 @click.option(
     "--in-net-worth/--not-in-net-worth", default=True, help="Include in net worth"
 )
+@require_mutations
 def accounts_create(name, account_type, subtype, balance, in_net_worth):
     """Create a manual account."""
     mm = get_client()
@@ -242,6 +282,7 @@ def accounts_create(name, account_type, subtype, balance, in_net_worth):
 @click.option("--in-net-worth", type=bool, help="Include in net worth")
 @click.option("--hide-from-summary", type=bool, help="Hide from summary list")
 @click.option("--hide-transactions", type=bool, help="Hide transactions from reports")
+@require_mutations
 def accounts_update(
     account_id,
     name,
@@ -272,6 +313,7 @@ def accounts_update(
 @accounts.command("delete")
 @click.argument("account_id")
 @click.confirmation_option(prompt="Are you sure you want to delete this account?")
+@require_mutations
 def accounts_delete(account_id):
     """Delete an account."""
     mm = get_client()
@@ -464,6 +506,7 @@ def transactions_splits(transaction_id):
 @click.option(
     "--update-balance/--no-update-balance", default=False, help="Update account balance"
 )
+@require_mutations
 def transactions_create(
     date, account_id, amount, merchant, category_id, notes, update_balance
 ):
@@ -492,6 +535,7 @@ def transactions_create(
 @click.option("--notes", "-n", help="Notes")
 @click.option("--hide-from-reports", type=bool, help="Hide from reports")
 @click.option("--needs-review", type=bool, help="Needs review flag")
+@require_mutations
 def transactions_update(
     transaction_id,
     category_id,
@@ -522,6 +566,7 @@ def transactions_update(
 @transactions.command("delete")
 @click.argument("transaction_id")
 @click.confirmation_option(prompt="Are you sure you want to delete this transaction?")
+@require_mutations
 def transactions_delete(transaction_id):
     """Delete a transaction."""
     mm = get_client()
@@ -561,6 +606,7 @@ def categories_groups():
 @click.option("--name", "-n", required=True, help="Category name")
 @click.option("--icon", default="❓", help="Category icon")
 @click.option("--rollover/--no-rollover", default=False, help="Enable rollover")
+@require_mutations
 def categories_create(group_id, name, icon, rollover):
     """Create a category."""
     mm = get_client()
@@ -578,6 +624,7 @@ def categories_create(group_id, name, icon, rollover):
 @categories.command("delete")
 @click.argument("category_id")
 @click.confirmation_option(prompt="Are you sure you want to delete this category?")
+@require_mutations
 def categories_delete(category_id):
     """Delete a category."""
     mm = get_client()
@@ -607,6 +654,7 @@ def tags_list():
 @tags.command("create")
 @click.option("--name", "-n", required=True, help="Tag name")
 @click.option("--color", "-c", default="blue", help="Tag color")
+@require_mutations
 def tags_create(name, color):
     """Create a tag."""
     mm = get_client()
@@ -617,6 +665,7 @@ def tags_create(name, color):
 @tags.command("set")
 @click.argument("transaction_id")
 @click.option("--tag-id", "-t", multiple=True, required=True, help="Tag IDs to set")
+@require_mutations
 def tags_set(transaction_id, tag_id):
     """Set tags on a transaction."""
     mm = get_client()
@@ -658,6 +707,7 @@ def budgets_list(start_date, end_date):
     default=False,
     help="Apply to future months",
 )
+@require_mutations
 def budgets_set(
     amount, category_id, category_group_id, timeframe, start_date, apply_to_future
 ):

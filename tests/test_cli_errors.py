@@ -345,6 +345,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "accounts", "create",
                     "--name", "Test Account",
                     "--type", "depository",
@@ -373,6 +374,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "transactions", "update", "txn_001",
                     "--category-id", "cat_001",
                     "--merchant", "New Merchant",
@@ -440,6 +442,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "budgets", "set",
                     "--amount", "1000",
                     "--category-id", "cat_001",
@@ -466,6 +469,7 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
+                    "--allow-mutations",
                     "categories", "create",
                     "--group-id", "grp_001",
                     "--name", "New Category",
@@ -485,7 +489,7 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "delete", "123"], input="n\n")
+            result = runner.invoke(cli, ["--allow-mutations", "accounts", "delete", "123"], input="n\n")
 
             assert result.exit_code == 1
             mm_instance.delete_account.assert_not_called()
@@ -496,7 +500,7 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "delete", "txn_001"], input="n\n")
+            result = runner.invoke(cli, ["--allow-mutations", "transactions", "delete", "txn_001"], input="n\n")
 
             assert result.exit_code == 1
             mm_instance.delete_transaction.assert_not_called()
@@ -507,7 +511,7 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "delete", "cat_001"], input="n\n")
+            result = runner.invoke(cli, ["--allow-mutations", "categories", "delete", "cat_001"], input="n\n")
 
             assert result.exit_code == 1
             mm_instance.delete_transaction_category.assert_not_called()
@@ -663,3 +667,132 @@ class TestSpecialResponses:
             assert result.exit_code == 0
             call_kwargs = mm_instance.get_aggregate_snapshots.call_args[1]
             assert call_kwargs["account_type"] == "investment"
+
+
+# ============================================================================
+# Read-Only Mode Tests
+# ============================================================================
+
+
+class TestReadOnlyMode:
+    """Tests for read-only safe mode."""
+
+    def test_accounts_create_blocked_without_flag(self, runner):
+        """Test accounts create is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            [
+                "accounts", "create",
+                "--name", "Test Account",
+                "--type", "depository",
+                "--subtype", "checking",
+                "--balance", "1000",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+        assert "--allow-mutations" in result.output
+
+    def test_accounts_update_blocked_without_flag(self, runner):
+        """Test accounts update is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["accounts", "update", "123", "--name", "New Name"])
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_accounts_delete_blocked_without_flag(self, runner):
+        """Test accounts delete is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["accounts", "delete", "123", "--yes"])
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_transactions_create_blocked_without_flag(self, runner):
+        """Test transactions create is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            [
+                "transactions", "create",
+                "--date", "2024-01-15",
+                "--account-id", "123",
+                "--amount", "-50.00",
+                "--merchant", "Test",
+                "--category-id", "cat_001",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_transactions_update_blocked_without_flag(self, runner):
+        """Test transactions update is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["transactions", "update", "txn_001", "--merchant", "New Merchant"],
+        )
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_transactions_delete_blocked_without_flag(self, runner):
+        """Test transactions delete is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["transactions", "delete", "txn_001", "--yes"])
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_categories_create_blocked_without_flag(self, runner):
+        """Test categories create is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["categories", "create", "--group-id", "grp_001", "--name", "New Category"],
+        )
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_categories_delete_blocked_without_flag(self, runner):
+        """Test categories delete is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["categories", "delete", "cat_001", "--yes"])
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_tags_create_blocked_without_flag(self, runner):
+        """Test tags create is blocked without --allow-mutations."""
+        result = runner.invoke(cli, ["tags", "create", "--name", "New Tag"])
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_tags_set_blocked_without_flag(self, runner):
+        """Test tags set is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["tags", "set", "txn_001", "--tag-id", "tag_001"],
+        )
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_budgets_set_blocked_without_flag(self, runner):
+        """Test budgets set is blocked without --allow-mutations."""
+        result = runner.invoke(
+            cli,
+            ["budgets", "set", "--amount", "500", "--category-id", "cat_001"],
+        )
+
+        assert result.exit_code == 1
+        assert "This command modifies data" in result.output
+
+    def test_read_commands_work_without_flag(self, runner):
+        """Test that read-only commands work without --allow-mutations."""
+        with patch("mmoney_cli.cli.get_client") as mock_get_client:
+            mm_instance = MagicMock()
+            mm_instance.get_accounts = AsyncMock(return_value={"accounts": []})
+            mock_get_client.return_value = mm_instance
+
+            result = runner.invoke(cli, ["accounts", "list"])
+
+            assert result.exit_code == 0
