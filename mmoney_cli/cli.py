@@ -263,7 +263,7 @@ def get_output_format() -> str:
     root = ctx
     while root.parent:
         root = root.parent
-    return (root.obj or {}).get(_OUTPUT_FORMAT, OutputFormat.JSON)
+    return (root.obj or {}).get(_OUTPUT_FORMAT, OutputFormat.TEXT)
 
 
 def output_result(data: Any):
@@ -311,8 +311,8 @@ def require_mutations(f):
 @click.option(
     "--format", "-f",
     type=click.Choice(["json", "jsonl", "csv", "text"]),
-    default="json",
-    help="Output format: json (default), jsonl (streaming), csv (tabular), text (key=value).",
+    default="text",
+    help="Output format: text (default, key=value), json, jsonl (streaming), csv (tabular).",
 )
 @click.pass_context
 def cli(ctx, allow_mutations, format):
@@ -325,10 +325,10 @@ def cli(ctx, allow_mutations, format):
 
     \b
     OUTPUT FORMATS:
-    - json: Pretty-printed JSON (default, backward compatible)
+    - text: Key=value pairs (default, simple extraction, grep/awk)
+    - json: Pretty-printed JSON (nested data, backward compatible)
     - jsonl: One JSON object per line (streaming, line processing)
     - csv: Comma-separated values (tabular data, spreadsheets)
-    - text: Key=value pairs (simple extraction, grep/awk)
     """
     ctx.ensure_object(dict)
     ctx.obj[_ALLOW_MUTATIONS] = allow_mutations

@@ -244,7 +244,7 @@ class TestEdgeCases:
             mm_instance.get_accounts = AsyncMock(return_value={"accounts": []})
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "list"])
+            result = runner.invoke(cli, ["-f", "json", "accounts", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -259,7 +259,7 @@ class TestEdgeCases:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "list"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -272,7 +272,7 @@ class TestEdgeCases:
             mm_instance.get_transaction_categories = AsyncMock(return_value={"categories": []})
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "list"])
+            result = runner.invoke(cli, ["-f", "json", "categories", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -287,7 +287,7 @@ class TestEdgeCases:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["tags", "list"])
+            result = runner.invoke(cli, ["-f", "json", "tags", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -615,7 +615,7 @@ class TestSpecialResponses:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "list"])
+            result = runner.invoke(cli, ["-f", "json", "accounts", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -633,7 +633,7 @@ class TestSpecialResponses:
             )
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "list", "--limit", "1000"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "list", "--limit", "1000"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)

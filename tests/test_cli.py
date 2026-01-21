@@ -161,7 +161,7 @@ class TestAccountsCommands:
             mm_instance.get_accounts = AsyncMock(return_value=mock_accounts_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "list"])
+            result = runner.invoke(cli, ["-f", "json", "accounts", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -176,7 +176,7 @@ class TestAccountsCommands:
             mm_instance.get_account_type_options = AsyncMock(return_value=mock_types)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["accounts", "types"])
+            result = runner.invoke(cli, ["-f", "json", "accounts", "types"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -274,7 +274,7 @@ class TestTransactionsCommands:
             mm_instance.get_transactions = AsyncMock(return_value=mock_transactions_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "list", "--limit", "10"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "list", "--limit", "10"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -309,7 +309,7 @@ class TestTransactionsCommands:
             mm_instance.get_transaction_details = AsyncMock(return_value=mock_detail)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "get", "txn_001"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "get", "txn_001"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -323,7 +323,7 @@ class TestTransactionsCommands:
             mm_instance.get_transactions_summary = AsyncMock(return_value=mock_summary)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "summary"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "summary"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -389,7 +389,7 @@ class TestTransactionsCommands:
             mm_instance.get_transaction_splits = AsyncMock(return_value=mock_splits)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["transactions", "splits", "txn_001"])
+            result = runner.invoke(cli, ["-f", "json", "transactions", "splits", "txn_001"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -453,7 +453,7 @@ class TestHoldingsCommands:
             mm_instance.get_recent_account_balances = AsyncMock(return_value=mock_balances)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["holdings", "balances"])
+            result = runner.invoke(cli, ["-f", "json", "holdings", "balances"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -475,7 +475,7 @@ class TestCategoriesCommands:
             mm_instance.get_transaction_categories = AsyncMock(return_value=mock_categories_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "list"])
+            result = runner.invoke(cli, ["-f", "json", "categories", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -489,7 +489,7 @@ class TestCategoriesCommands:
             mm_instance.get_transaction_category_groups = AsyncMock(return_value=mock_groups)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["categories", "groups"])
+            result = runner.invoke(cli, ["-f", "json", "categories", "groups"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -539,7 +539,7 @@ class TestTagsCommands:
             mm_instance.get_transaction_tags = AsyncMock(return_value=mock_tags_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["tags", "list"])
+            result = runner.invoke(cli, ["-f", "json", "tags", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -590,7 +590,7 @@ class TestBudgetsCommands:
             mm_instance.get_budgets = AsyncMock(return_value=mock_budgets_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["budgets", "list"])
+            result = runner.invoke(cli, ["-f", "json", "budgets", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -643,7 +643,7 @@ class TestCashflowCommands:
             mm_instance.get_cashflow_summary = AsyncMock(return_value=mock_cashflow_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["cashflow", "summary"])
+            result = runner.invoke(cli, ["-f", "json", "cashflow", "summary"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -672,7 +672,7 @@ class TestCashflowCommands:
             mm_instance.get_cashflow = AsyncMock(return_value=mock_details)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["cashflow", "details"])
+            result = runner.invoke(cli, ["-f", "json", "cashflow", "details"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -694,7 +694,7 @@ class TestRecurringCommands:
             mm_instance.get_recurring_transactions = AsyncMock(return_value=mock_recurring_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["recurring", "list"])
+            result = runner.invoke(cli, ["-f", "json", "recurring", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -731,7 +731,7 @@ class TestInstitutionsCommands:
             mm_instance.get_institutions = AsyncMock(return_value=mock_institutions_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["institutions", "list"])
+            result = runner.invoke(cli, ["-f", "json", "institutions", "list"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
@@ -753,7 +753,7 @@ class TestSubscriptionCommands:
             mm_instance.get_subscription_details = AsyncMock(return_value=mock_subscription_response)
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["subscription", "status"])
+            result = runner.invoke(cli, ["-f", "json", "subscription", "status"])
 
             assert result.exit_code == 0
             output = json.loads(result.output)
