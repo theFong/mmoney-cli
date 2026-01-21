@@ -1287,22 +1287,25 @@ class TestKeychainStorage:
             assert result is False
 
     def test_get_client_uses_keychain_first(self):
-        """Test get_client tries keychain before file."""
+        """Test get_client tries keychain before file and sets Authorization header."""
         with (
             patch("mmoney_cli.cli.load_token_from_keychain") as mock_load,
             patch("mmoney_cli.cli.MonarchMoney") as MockMM,
         ):
             mock_load.return_value = "keychain_token"
             mm_instance = MagicMock()
+            mm_instance._headers = {}
             MockMM.return_value = mm_instance
 
             from mmoney_cli.cli import get_client
 
-            get_client()  # Call to trigger mocks
+            get_client()
 
             mock_load.assert_called_once()
             mm_instance.set_token.assert_called_once_with("keychain_token")
             mm_instance.load_session.assert_not_called()
+            # Verify Authorization header is set (regression test for 401 bug)
+            assert mm_instance._headers["Authorization"] == "Token keychain_token"
 
     def test_get_client_falls_back_to_file(self):
         """Test get_client falls back to file when keychain empty."""
