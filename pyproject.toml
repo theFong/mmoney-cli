@@ -37,6 +37,10 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "black>=23.0.0",
+    "ruff>=0.8.0",
+    "vulture>=2.13",
+    "pre-commit>=4.0.0",
+    "detect-secrets>=1.5.0",
 ]
 
 [project.scripts]
@@ -53,3 +57,29 @@ where = ["."]
 [tool.black]
 line-length = 100
 target-version = ["py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mmoney_cli"]
+
+[tool.vulture]
+min_confidence = 80
+paths = ["mmoney_cli"]
+exclude = ["tests/"]

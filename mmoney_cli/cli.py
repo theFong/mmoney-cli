@@ -6,20 +6,18 @@ import csv
 import functools
 import io
 import json
-import os
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Optional, List, Any, Dict
+from typing import Any, Optional
 
 import click
 import keyring
+from monarchmoney import MonarchMoney
 
 # Context keys
 _ALLOW_MUTATIONS = "allow_mutations"
 _OUTPUT_FORMAT = "output_format"
-
-from monarchmoney import MonarchMoney
 
 # Config directory in user's home
 _CONFIG_DIR = Path.home() / ".mmoney"
@@ -30,6 +28,7 @@ def _ensure_config_dir():
     """Create config directory if it doesn't exist."""
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
+
 __version__ = "0.1.0"
 
 
@@ -37,8 +36,10 @@ __version__ = "0.1.0"
 # Exit Codes
 # ============================================================================
 
+
 class ExitCode:
     """Standard exit codes for agent-friendly error handling."""
+
     SUCCESS = 0
     GENERAL_ERROR = 1
     AUTH_ERROR = 2
@@ -52,8 +53,10 @@ class ExitCode:
 # Error Codes
 # ============================================================================
 
+
 class ErrorCode:
     """Error codes for structured error responses."""
+
     # Authentication errors
     AUTH_REQUIRED = "AUTH_REQUIRED"
     AUTH_FAILED = "AUTH_FAILED"
@@ -82,7 +85,9 @@ class ErrorCode:
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
 
 
-def output_error(code: str, message: str, details: str = None, exit_code: int = ExitCode.GENERAL_ERROR):
+def output_error(
+    code: str, message: str, details: str = None, exit_code: int = ExitCode.GENERAL_ERROR
+):
     """Output a structured error and exit.
 
     Args:
@@ -120,13 +125,14 @@ def output_error(code: str, message: str, details: str = None, exit_code: int = 
 
 class OutputFormat:
     """Available output formats."""
+
     JSON = "json"
     JSONL = "jsonl"
     CSV = "csv"
     TEXT = "text"
 
 
-def _flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
+def _flatten_dict(d: dict, parent_key: str = "", sep: str = ".") -> dict:
     """Flatten nested dictionary for CSV/text output."""
     items = []
     for k, v in d.items():
@@ -141,7 +147,7 @@ def _flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
     return dict(items)
 
 
-def _extract_records(data: Any, key_hint: str = None) -> List[Dict]:
+def _extract_records(data: Any) -> list[dict]:
     """Extract a list of records from API response for tabular output.
 
     Handles common API response patterns:
@@ -155,9 +161,17 @@ def _extract_records(data: Any, key_hint: str = None) -> List[Dict]:
     if isinstance(data, dict):
         # Try common keys that contain record lists
         list_keys = [
-            "accounts", "results", "transactions", "categories",
-            "householdTransactionTags", "credentials", "budgetData",
-            "recurringTransactions", "splits", "snapshots", "history"
+            "accounts",
+            "results",
+            "transactions",
+            "categories",
+            "householdTransactionTags",
+            "credentials",
+            "budgetData",
+            "recurringTransactions",
+            "splits",
+            "snapshots",
+            "history",
         ]
 
         # Check for nested results (e.g., allTransactions.results)
@@ -344,6 +358,7 @@ def require_mutations(f):
     Apply this to any command that creates, updates, or deletes data.
     Users must pass --allow-mutations to use these commands.
     """
+
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         ctx = click.get_current_context()
@@ -359,6 +374,7 @@ def require_mutations(f):
                 exit_code=ExitCode.MUTATION_BLOCKED,
             )
         return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -376,7 +392,8 @@ def require_mutations(f):
     help="Enable commands that modify data (create, update, delete). Default: read-only.",
 )
 @click.option(
-    "--format", "-f",
+    "--format",
+    "-f",
     type=click.Choice(["json", "jsonl", "csv", "text"]),
     default="text",
     help="Output format: text (default, key=value), json, jsonl (streaming), csv (tabular).",
@@ -420,9 +437,7 @@ def auth():
 @click.option("--mfa-code", help="One-time MFA code (6 digits)")
 @click.option("--token", "-t", help="Auth token from browser (bypasses captcha)")
 @click.option("--device-uuid", "-d", help="Device UUID from browser (bypasses MFA)")
-@click.option(
-    "--interactive/--no-interactive", "-i", default=True, help="Use interactive login"
-)
+@click.option("--interactive/--no-interactive", "-i", default=True, help="Use interactive login")
 def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, interactive):
     """Login to Monarch Money.
 
@@ -487,11 +502,7 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 exit_code=ExitCode.VALIDATION_ERROR,
             )
         try:
-            run_async(
-                mm.multi_factor_authenticate(
-                    email=email, password=password, code=mfa_code
-                )
-            )
+            run_async(mm.multi_factor_authenticate(email=email, password=password, code=mfa_code))
             if mm.token and save_token_to_keychain(mm.token):
                 click.echo("Session saved to system keychain.")
             else:
@@ -524,7 +535,9 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             )
         try:
             run_async(
-                mm.login(email=email, password=password, mfa_secret_key=mfa_secret, save_session=False)
+                mm.login(
+                    email=email, password=password, mfa_secret_key=mfa_secret, save_session=False
+                )
             )
             # Save to keychain after successful login
             if mm.token and save_token_to_keychain(mm.token):
@@ -620,9 +633,7 @@ def accounts_types():
 @click.option("--type", "account_type", required=True, help="Account type")
 @click.option("--subtype", required=True, help="Account subtype")
 @click.option("--balance", "-b", default=0.0, type=float, help="Initial balance")
-@click.option(
-    "--in-net-worth/--not-in-net-worth", default=True, help="Include in net worth"
-)
+@click.option("--in-net-worth/--not-in-net-worth", default=True, help="Include in net worth")
 @require_mutations
 def accounts_create(name, account_type, subtype, balance, in_net_worth):
     """Create a manual account."""
@@ -688,9 +699,7 @@ def accounts_delete(account_id):
 
 
 @accounts.command("refresh")
-@click.option(
-    "--account-ids", "-a", multiple=True, help="Account IDs to refresh (default: all)"
-)
+@click.option("--account-ids", "-a", multiple=True, help="Account IDs to refresh (default: all)")
 @click.option("--wait/--no-wait", default=True, help="Wait for refresh to complete")
 @click.option("--timeout", default=300, type=int, help="Timeout in seconds (for --wait)")
 def accounts_refresh(account_ids, wait, timeout):
@@ -759,9 +768,7 @@ def holdings_snapshots(start_date, end_date, account_type):
     end = date.fromisoformat(end_date) if end_date else None
 
     result = run_async(
-        mm.get_aggregate_snapshots(
-            start_date=start, end_date=end, account_type=account_type
-        )
+        mm.get_aggregate_snapshots(start_date=start, end_date=end, account_type=account_type)
     )
     output_result(result)
 
@@ -863,19 +870,13 @@ def transactions_splits(transaction_id):
 @transactions.command("create")
 @click.option("--date", "-d", required=True, help="Transaction date (YYYY-MM-DD)")
 @click.option("--account-id", "-a", required=True, help="Account ID")
-@click.option(
-    "--amount", required=True, type=float, help="Amount (negative for expense)"
-)
+@click.option("--amount", required=True, type=float, help="Amount (negative for expense)")
 @click.option("--merchant", "-m", required=True, help="Merchant name")
 @click.option("--category-id", "-c", required=True, help="Category ID")
 @click.option("--notes", "-n", default="", help="Notes")
-@click.option(
-    "--update-balance/--no-update-balance", default=False, help="Update account balance"
-)
+@click.option("--update-balance/--no-update-balance", default=False, help="Update account balance")
 @require_mutations
-def transactions_create(
-    date, account_id, amount, merchant, category_id, notes, update_balance
-):
+def transactions_create(date, account_id, amount, merchant, category_id, notes, update_balance):
     """Create a transaction."""
     mm = get_client()
     result = run_async(
@@ -1035,9 +1036,7 @@ def tags_create(name, color):
 def tags_set(transaction_id, tag_id):
     """Set tags on a transaction."""
     mm = get_client()
-    result = run_async(
-        mm.set_transaction_tags(transaction_id=transaction_id, tag_ids=list(tag_id))
-    )
+    result = run_async(mm.set_transaction_tags(transaction_id=transaction_id, tag_ids=list(tag_id)))
     output_result(result)
 
 
@@ -1074,9 +1073,7 @@ def budgets_list(start_date, end_date):
     help="Apply to future months",
 )
 @require_mutations
-def budgets_set(
-    amount, category_id, category_group_id, timeframe, start_date, apply_to_future
-):
+def budgets_set(amount, category_id, category_group_id, timeframe, start_date, apply_to_future):
     """Set a budget amount."""
     mm = get_client()
     result = run_async(
@@ -1123,9 +1120,7 @@ def cashflow_summary(start_date, end_date, limit):
 def cashflow_details(start_date, end_date, limit):
     """Get detailed cashflow (by category, merchant)."""
     mm = get_client()
-    result = run_async(
-        mm.get_cashflow(limit=limit, start_date=start_date, end_date=end_date)
-    )
+    result = run_async(mm.get_cashflow(limit=limit, start_date=start_date, end_date=end_date))
     output_result(result)
 
 
@@ -1146,9 +1141,7 @@ def recurring():
 def recurring_list(start_date, end_date):
     """List recurring transactions."""
     mm = get_client()
-    result = run_async(
-        mm.get_recurring_transactions(start_date=start_date, end_date=end_date)
-    )
+    result = run_async(mm.get_recurring_transactions(start_date=start_date, end_date=end_date))
     output_result(result)
 
 

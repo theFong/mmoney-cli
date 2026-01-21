@@ -1,13 +1,26 @@
 """Tests for CLI error handling and edge cases."""
 
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from click.testing import CliRunner
 
 from mmoney_cli.cli import (
-    cli, output_json, output_jsonl, output_csv, output_text, output_data, output_error,
-    get_client, run_async, ExitCode, ErrorCode, OutputFormat, _flatten_dict, _extract_records
+    ErrorCode,
+    ExitCode,
+    OutputFormat,
+    _extract_records,
+    _flatten_dict,
+    cli,
+    get_client,
+    output_csv,
+    output_data,
+    output_error,
+    output_json,
+    output_jsonl,
+    output_text,
+    run_async,
 )
 
 
@@ -29,9 +42,7 @@ class TestAuthErrors:
         """Test login with invalid credentials."""
         with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
             mm_instance = MagicMock()
-            mm_instance.login = AsyncMock(
-                side_effect=Exception("Invalid email or password")
-            )
+            mm_instance.login = AsyncMock(side_effect=Exception("Invalid email or password"))
             MockMM.return_value = mm_instance
 
             result = runner.invoke(
@@ -74,11 +85,15 @@ class TestAuthErrors:
             result = runner.invoke(
                 cli,
                 [
-                    "auth", "login",
+                    "auth",
+                    "login",
                     "--no-interactive",
-                    "--mfa-secret", "JBSWY3DPEHPK3PXP",
-                    "-e", "test@example.com",
-                    "-p", "password123",
+                    "--mfa-secret",
+                    "JBSWY3DPEHPK3PXP",
+                    "-e",
+                    "test@example.com",
+                    "-p",
+                    "password123",
                 ],
             )
 
@@ -94,9 +109,7 @@ class TestAuthErrors:
         """Test login with network error."""
         with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
             mm_instance = MagicMock()
-            mm_instance.login = AsyncMock(
-                side_effect=Exception("Connection refused")
-            )
+            mm_instance.login = AsyncMock(side_effect=Exception("Connection refused"))
             MockMM.return_value = mm_instance
 
             result = runner.invoke(
@@ -129,9 +142,7 @@ class TestAPIErrors:
         """Test accounts list when API returns error."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_accounts = AsyncMock(
-                side_effect=Exception("API Error: Unauthorized")
-            )
+            mm_instance.get_accounts = AsyncMock(side_effect=Exception("API Error: Unauthorized"))
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(cli, ["accounts", "list"])
@@ -142,9 +153,7 @@ class TestAPIErrors:
         """Test transactions list with timeout."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_transactions = AsyncMock(
-                side_effect=TimeoutError("Request timed out")
-            )
+            mm_instance.get_transactions = AsyncMock(side_effect=TimeoutError("Request timed out"))
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(cli, ["transactions", "list"])
@@ -356,11 +365,16 @@ class TestEdgeCases:
                 cli,
                 [
                     "--allow-mutations",
-                    "accounts", "create",
-                    "--name", "Test Account",
-                    "--type", "depository",
-                    "--subtype", "savings",
-                    "--balance", "5000.50",
+                    "accounts",
+                    "create",
+                    "--name",
+                    "Test Account",
+                    "--type",
+                    "depository",
+                    "--subtype",
+                    "savings",
+                    "--balance",
+                    "5000.50",
                     "--not-in-net-worth",
                 ],
             )
@@ -385,14 +399,23 @@ class TestEdgeCases:
                 cli,
                 [
                     "--allow-mutations",
-                    "transactions", "update", "txn_001",
-                    "--category-id", "cat_001",
-                    "--merchant", "New Merchant",
-                    "--amount", "-75.50",
-                    "--date", "2024-02-01",
-                    "--notes", "Updated note",
-                    "--hide-from-reports", "true",
-                    "--needs-review", "false",
+                    "transactions",
+                    "update",
+                    "txn_001",
+                    "--category-id",
+                    "cat_001",
+                    "--merchant",
+                    "New Merchant",
+                    "--amount",
+                    "-75.50",
+                    "--date",
+                    "2024-02-01",
+                    "--notes",
+                    "Updated note",
+                    "--hide-from-reports",
+                    "true",
+                    "--needs-review",
+                    "false",
                 ],
             )
 
@@ -415,20 +438,34 @@ class TestEdgeCases:
             result = runner.invoke(
                 cli,
                 [
-                    "transactions", "list",
-                    "--limit", "50",
-                    "--offset", "10",
-                    "--start-date", "2024-01-01",
-                    "--end-date", "2024-12-31",
-                    "--search", "coffee",
-                    "--category-id", "cat_001",
-                    "--category-id", "cat_002",
-                    "--account-id", "acc_001",
-                    "--tag-id", "tag_001",
-                    "--has-attachments", "true",
-                    "--has-notes", "true",
-                    "--is-split", "false",
-                    "--is-recurring", "false",
+                    "transactions",
+                    "list",
+                    "--limit",
+                    "50",
+                    "--offset",
+                    "10",
+                    "--start-date",
+                    "2024-01-01",
+                    "--end-date",
+                    "2024-12-31",
+                    "--search",
+                    "coffee",
+                    "--category-id",
+                    "cat_001",
+                    "--category-id",
+                    "cat_002",
+                    "--account-id",
+                    "acc_001",
+                    "--tag-id",
+                    "tag_001",
+                    "--has-attachments",
+                    "true",
+                    "--has-notes",
+                    "true",
+                    "--is-split",
+                    "false",
+                    "--is-recurring",
+                    "false",
                 ],
             )
 
@@ -453,11 +490,16 @@ class TestEdgeCases:
                 cli,
                 [
                     "--allow-mutations",
-                    "budgets", "set",
-                    "--amount", "1000",
-                    "--category-id", "cat_001",
-                    "--timeframe", "month",
-                    "--start-date", "2024-01-01",
+                    "budgets",
+                    "set",
+                    "--amount",
+                    "1000",
+                    "--category-id",
+                    "cat_001",
+                    "--timeframe",
+                    "month",
+                    "--start-date",
+                    "2024-01-01",
                     "--apply-to-future",
                 ],
             )
@@ -480,10 +522,14 @@ class TestEdgeCases:
                 cli,
                 [
                     "--allow-mutations",
-                    "categories", "create",
-                    "--group-id", "grp_001",
-                    "--name", "New Category",
-                    "--icon", "🎉",
+                    "categories",
+                    "create",
+                    "--group-id",
+                    "grp_001",
+                    "--name",
+                    "New Category",
+                    "--icon",
+                    "🎉",
                     "--rollover",
                 ],
             )
@@ -499,7 +545,9 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["--allow-mutations", "accounts", "delete", "123"], input="n\n")
+            result = runner.invoke(
+                cli, ["--allow-mutations", "accounts", "delete", "123"], input="n\n"
+            )
 
             assert result.exit_code == 1
             mm_instance.delete_account.assert_not_called()
@@ -510,7 +558,9 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["--allow-mutations", "transactions", "delete", "txn_001"], input="n\n")
+            result = runner.invoke(
+                cli, ["--allow-mutations", "transactions", "delete", "txn_001"], input="n\n"
+            )
 
             assert result.exit_code == 1
             mm_instance.delete_transaction.assert_not_called()
@@ -521,7 +571,9 @@ class TestEdgeCases:
             mm_instance = MagicMock()
             mock_get_client.return_value = mm_instance
 
-            result = runner.invoke(cli, ["--allow-mutations", "categories", "delete", "cat_001"], input="n\n")
+            result = runner.invoke(
+                cli, ["--allow-mutations", "categories", "delete", "cat_001"], input="n\n"
+            )
 
             assert result.exit_code == 1
             mm_instance.delete_transaction_category.assert_not_called()
@@ -553,6 +605,7 @@ class TestUtilityFunctions:
     def test_output_json_with_date(self, runner, capsys):
         """Test output_json handles date objects."""
         from datetime import date, datetime
+
         data = {"date": date(2024, 1, 15), "datetime": datetime(2024, 1, 15, 10, 30)}
         output_json(data, pretty=False)
         captured = capsys.readouterr()
@@ -560,9 +613,11 @@ class TestUtilityFunctions:
 
     def test_get_client_loads_session(self):
         """Test get_client loads session from file when keychain is empty."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
-             patch("mmoney_cli.cli.load_token_from_keychain") as mock_keychain, \
-             patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file:
+        with (
+            patch("mmoney_cli.cli.MonarchMoney") as MockMM,
+            patch("mmoney_cli.cli.load_token_from_keychain") as mock_keychain,
+            patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file,
+        ):
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
             mock_keychain.return_value = None  # No keychain token
@@ -587,6 +642,7 @@ class TestUtilityFunctions:
 
     def test_run_async(self):
         """Test run_async executes coroutine."""
+
         async def sample_coro():
             return "result"
 
@@ -630,9 +686,7 @@ class TestSpecialResponses:
         """Test transactions list handles large response."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            large_results = [
-                {"id": f"txn_{i}", "amount": -10.00} for i in range(1000)
-            ]
+            large_results = [{"id": f"txn_{i}", "amount": -10.00} for i in range(1000)]
             mm_instance.get_transactions = AsyncMock(
                 return_value={"allTransactions": {"totalCount": 1000, "results": large_results}}
             )
@@ -648,9 +702,7 @@ class TestSpecialResponses:
         """Test holdings snapshots with date parsing."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_aggregate_snapshots = AsyncMock(
-                return_value={"snapshots": []}
-            )
+            mm_instance.get_aggregate_snapshots = AsyncMock(return_value={"snapshots": []})
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(
@@ -661,6 +713,7 @@ class TestSpecialResponses:
             assert result.exit_code == 0
             call_kwargs = mm_instance.get_aggregate_snapshots.call_args[1]
             from datetime import date
+
             assert call_kwargs["start_date"] == date(2024, 1, 1)
             assert call_kwargs["end_date"] == date(2024, 12, 31)
 
@@ -668,9 +721,7 @@ class TestSpecialResponses:
         """Test holdings snapshots with account type filter."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_aggregate_snapshots = AsyncMock(
-                return_value={"snapshots": []}
-            )
+            mm_instance.get_aggregate_snapshots = AsyncMock(return_value={"snapshots": []})
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(
@@ -696,11 +747,16 @@ class TestReadOnlyMode:
         result = runner.invoke(
             cli,
             [
-                "accounts", "create",
-                "--name", "Test Account",
-                "--type", "depository",
-                "--subtype", "checking",
-                "--balance", "1000",
+                "accounts",
+                "create",
+                "--name",
+                "Test Account",
+                "--type",
+                "depository",
+                "--subtype",
+                "checking",
+                "--balance",
+                "1000",
             ],
         )
 
@@ -731,12 +787,18 @@ class TestReadOnlyMode:
         result = runner.invoke(
             cli,
             [
-                "transactions", "create",
-                "--date", "2024-01-15",
-                "--account-id", "123",
-                "--amount", "-50.00",
-                "--merchant", "Test",
-                "--category-id", "cat_001",
+                "transactions",
+                "create",
+                "--date",
+                "2024-01-15",
+                "--account-id",
+                "123",
+                "--amount",
+                "-50.00",
+                "--merchant",
+                "Test",
+                "--category-id",
+                "cat_001",
             ],
         )
 
@@ -1127,9 +1189,7 @@ class TestOutputFormatCLIOption:
         """Test -f short flag for format."""
         with patch("mmoney_cli.cli.get_client") as mock_get_client:
             mm_instance = MagicMock()
-            mm_instance.get_accounts = AsyncMock(
-                return_value={"accounts": [{"id": "1"}]}
-            )
+            mm_instance.get_accounts = AsyncMock(return_value={"accounts": [{"id": "1"}]})
             mock_get_client.return_value = mm_instance
 
             result = runner.invoke(cli, ["-f", "jsonl", "accounts", "list"])
@@ -1184,9 +1244,7 @@ class TestKeychainStorage:
             result = load_token_from_keychain()
 
             assert result == "saved_token"
-            mock_keyring.get_password.assert_called_once_with(
-                "mmoney-cli", "monarch-token"
-            )
+            mock_keyring.get_password.assert_called_once_with("mmoney-cli", "monarch-token")
 
     def test_load_token_from_keychain_not_found(self):
         """Test loading token when not in keychain."""
@@ -1216,9 +1274,7 @@ class TestKeychainStorage:
             result = delete_token_from_keychain()
 
             assert result is True
-            mock_keyring.delete_password.assert_called_once_with(
-                "mmoney-cli", "monarch-token"
-            )
+            mock_keyring.delete_password.assert_called_once_with("mmoney-cli", "monarch-token")
 
     def test_delete_token_from_keychain_failure(self):
         """Test deleting token when keyring fails."""
@@ -1232,14 +1288,17 @@ class TestKeychainStorage:
 
     def test_get_client_uses_keychain_first(self):
         """Test get_client tries keychain before file."""
-        with patch("mmoney_cli.cli.load_token_from_keychain") as mock_load, \
-             patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+        with (
+            patch("mmoney_cli.cli.load_token_from_keychain") as mock_load,
+            patch("mmoney_cli.cli.MonarchMoney") as MockMM,
+        ):
             mock_load.return_value = "keychain_token"
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
 
             from mmoney_cli.cli import get_client
-            client = get_client()
+
+            get_client()  # Call to trigger mocks
 
             mock_load.assert_called_once()
             mm_instance.set_token.assert_called_once_with("keychain_token")
@@ -1247,16 +1306,19 @@ class TestKeychainStorage:
 
     def test_get_client_falls_back_to_file(self):
         """Test get_client falls back to file when keychain empty."""
-        with patch("mmoney_cli.cli.load_token_from_keychain") as mock_load, \
-             patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
-             patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file:
+        with (
+            patch("mmoney_cli.cli.load_token_from_keychain") as mock_load,
+            patch("mmoney_cli.cli.MonarchMoney") as MockMM,
+            patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file,
+        ):
             mock_load.return_value = None
             mock_session_file.exists.return_value = True  # File exists
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
 
             from mmoney_cli.cli import get_client
-            client = get_client()
+
+            get_client()  # Call to trigger mocks
 
             mock_load.assert_called_once()
             mm_instance.set_token.assert_not_called()
@@ -1264,8 +1326,10 @@ class TestKeychainStorage:
 
     def test_auth_login_token_saves_to_keychain(self, runner):
         """Test auth login with token saves to keychain."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
-             patch("mmoney_cli.cli.save_token_to_keychain") as mock_save:
+        with (
+            patch("mmoney_cli.cli.MonarchMoney") as MockMM,
+            patch("mmoney_cli.cli.save_token_to_keychain") as mock_save,
+        ):
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
             mock_save.return_value = True
@@ -1278,8 +1342,10 @@ class TestKeychainStorage:
 
     def test_auth_login_token_fallback_to_file(self, runner):
         """Test auth login falls back to file when keychain fails."""
-        with patch("mmoney_cli.cli.MonarchMoney") as MockMM, \
-             patch("mmoney_cli.cli.save_token_to_keychain") as mock_save:
+        with (
+            patch("mmoney_cli.cli.MonarchMoney") as MockMM,
+            patch("mmoney_cli.cli.save_token_to_keychain") as mock_save,
+        ):
             mm_instance = MagicMock()
             MockMM.return_value = mm_instance
             mock_save.return_value = False  # Keychain fails
@@ -1292,8 +1358,10 @@ class TestKeychainStorage:
 
     def test_auth_logout_clears_keychain(self, runner):
         """Test auth logout clears keychain."""
-        with patch("mmoney_cli.cli.delete_token_from_keychain") as mock_delete, \
-             patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file:
+        with (
+            patch("mmoney_cli.cli.delete_token_from_keychain") as mock_delete,
+            patch("mmoney_cli.cli._SESSION_FILE") as mock_session_file,
+        ):
             mock_delete.return_value = True
             mock_session_file.exists.return_value = False  # No file to delete
 
