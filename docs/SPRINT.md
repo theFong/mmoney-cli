@@ -2,52 +2,89 @@
 
 This CLI is designed primarily for AI agent consumption. Priorities are set accordingly.
 
-## High Priority (v1 Release)
+---
 
-### Safety & Security
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#11](https://github.com/theFong/mmoney-cli/issues/11) | Read-only safe mode | **Critical** - Agents must not mutate financial data |
-| [#16](https://github.com/theFong/mmoney-cli/issues/16) | Store session in system keychain | Secure credential storage, important for agents |
+## Effort & Blast Radius Analysis
 
-### Agent-Friendly Output
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#10](https://github.com/theFong/mmoney-cli/issues/10) | Agent-friendly output formats | CSV, JSONL, plain text - simpler than nested JSON |
-| [#12](https://github.com/theFong/mmoney-cli/issues/12) | Structured error responses | Agents need parseable errors + consistent exit codes |
+Understanding effort and file changes helps parallelize work and avoid merge conflicts.
 
-### Documentation
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#19](https://github.com/theFong/mmoney-cli/issues/19) | Comprehensive command & object docs | Document every command, field, and Monarch Money concept |
-| [#13](https://github.com/theFong/mmoney-cli/issues/13) | Document JSON schema | Machine-readable schema for agent integration |
+### Effort Key
+- **S** = Small (< 1 hour)
+- **M** = Medium (1-4 hours)
+- **L** = Large (4+ hours)
 
-### Code Quality & CI
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#3](https://github.com/theFong/mmoney-cli/issues/3) | CI: Dead code linting | Keep context clean for agents |
-| [#4](https://github.com/theFong/mmoney-cli/issues/4) | CI: Lint rules and formatting | Code quality and consistency |
-| [#17](https://github.com/theFong/mmoney-cli/issues/17) | Generate realistic mock data | Enable fast iteration and offline testing |
+### Open Issues by Blast Radius
 
-### Distribution
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#1](https://github.com/theFong/mmoney-cli/issues/1) | Publish to PyPI | Distribution (read-only version first) |
+#### Isolated (No conflicts - can run in parallel with anything)
 
-## Medium Priority
+| Issue | Title | Effort | Files Changed |
+|-------|-------|--------|---------------|
+| [#19](https://github.com/theFong/mmoney-cli/issues/19) | Comprehensive docs | L | `docs/*.md`, `README.md` |
+| [#13](https://github.com/theFong/mmoney-cli/issues/13) | JSON schema docs | M | `docs/schemas/`, `README.md` |
+| [#17](https://github.com/theFong/mmoney-cli/issues/17) | Mock data for tests | M-L | `tests/fixtures/`, `tests/conftest.py` |
+| [#3](https://github.com/theFong/mmoney-cli/issues/3) | Dead code linting | S | `pyproject.toml`, `.github/workflows/ci.yml` |
+| [#4](https://github.com/theFong/mmoney-cli/issues/4) | Lint rules | S-M | `pyproject.toml`, `.github/workflows/ci.yml` |
+| [#1](https://github.com/theFong/mmoney-cli/issues/1) | Publish to PyPI | S | `pyproject.toml`, `.github/workflows/publish.yml` |
 
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#15](https://github.com/theFong/mmoney-cli/issues/15) | Move config to ~/.mmoney | Better usability, single session location |
-| [#6](https://github.com/theFong/mmoney-cli/issues/6) | Add type hints | Helps agent tooling, IDE support |
-| [#9](https://github.com/theFong/mmoney-cli/issues/9) | Improve error handling | Relates to #12 |
+#### Localized (Low conflict risk)
 
-## Low Priority
+| Issue | Title | Effort | Files Changed |
+|-------|-------|--------|---------------|
+| [#15](https://github.com/theFong/mmoney-cli/issues/15) | Config to ~/.mmoney | S | `mmoney_cli/cli.py` (session path ~20 lines) |
 
-| Issue | Title | Why |
-|-------|-------|-----|
-| [#7](https://github.com/theFong/mmoney-cli/issues/7) | Refactor cli.py into modules | Internal, doesn't affect agents |
-| [#8](https://github.com/theFong/mmoney-cli/issues/8) | Add logging with --debug flag | Human debugging, less relevant for agents |
+#### Touches cli.py (Moderate conflict risk - coordinate timing)
+
+| Issue | Title | Effort | Files Changed |
+|-------|-------|--------|---------------|
+| [#6](https://github.com/theFong/mmoney-cli/issues/6) | Add type hints | M | `mmoney_cli/cli.py` (all functions) |
+| [#8](https://github.com/theFong/mmoney-cli/issues/8) | Logging/debug flag | M | `mmoney_cli/cli.py` (scattered) |
+| [#9](https://github.com/theFong/mmoney-cli/issues/9) | Error handling | M | `mmoney_cli/cli.py` (error paths) |
+
+#### High Blast Radius (Do last or in isolation)
+
+| Issue | Title | Effort | Files Changed |
+|-------|-------|--------|---------------|
+| [#7](https://github.com/theFong/mmoney-cli/issues/7) | Refactor into modules | L | `mmoney_cli/cli.py` → split into `mmoney_cli/commands/*.py` |
+
+---
+
+## Recommended Execution Order
+
+To maximize parallelism and minimize merge conflicts:
+
+```
+Phase 1 (Parallel - no code changes)
+├── #19 Comprehensive docs      [docs only]
+├── #13 JSON schema docs        [docs only]
+├── #17 Mock test data          [tests only]
+├── #3  Dead code linting       [CI only]
+├── #4  Lint rules              [CI only]
+└── #1  PyPI setup              [config only]
+
+Phase 2 (Sequential - touches cli.py)
+├── #15 Config to ~/.mmoney     [small, localized]
+├── #6  Add type hints          [before refactor]
+├── #8  Logging                 [after type hints]
+└── #9  Error handling          [after type hints]
+
+Phase 3 (Isolation - high conflict)
+└── #7  Refactor into modules   [do last]
+```
+
+---
+
+## Parallel Work Streams
+
+These can run simultaneously without conflicts:
+
+| Stream | Issues | Owner |
+|--------|--------|-------|
+| Documentation | #19, #13 | Agent A |
+| CI/CD | #3, #4, #1 | Agent B |
+| Test Infrastructure | #17 | Agent C |
+| CLI Code | #15 → #6 → #8 → #9 → #7 | Agent D (sequential) |
+
+---
 
 ## Completed
 
@@ -55,38 +92,37 @@ This CLI is designed primarily for AI agent consumption. Priorities are set acco
 |-------|-------|
 | [#2](https://github.com/theFong/mmoney-cli/issues/2) | ~~CI: Build and test pipeline~~ |
 | [#5](https://github.com/theFong/mmoney-cli/issues/5) | ~~Add unit and integration tests~~ |
+| [#10](https://github.com/theFong/mmoney-cli/issues/10) | ~~Agent-friendly output formats~~ |
+| [#11](https://github.com/theFong/mmoney-cli/issues/11) | ~~Read-only safe mode~~ |
+| [#12](https://github.com/theFong/mmoney-cli/issues/12) | ~~Structured error responses~~ |
+| [#16](https://github.com/theFong/mmoney-cli/issues/16) | ~~Store session in keychain~~ |
 
 ---
 
 ## v1 Release Checklist
 
-### 1. Safety First
-- [ ] Remove/gate all mutation commands (#11)
-- [ ] Store credentials in system keychain (#16)
-- [ ] Document read-only commands clearly
-
-### 2. Agent-Friendly Output
-- [ ] Implement `--format csv` for list commands (#10)
-- [ ] Implement `--format jsonl` for streaming (#10)
-- [ ] Implement `--format text` for simple parsing (#10)
-- [ ] Structured JSON error responses (#12)
-- [ ] Consistent exit codes (#12)
-
-### 3. Documentation
+### 1. Documentation (Parallel)
 - [ ] Document all commands with examples (#19)
 - [ ] Document all data objects and fields (#19)
 - [ ] Reference Monarch Money concepts (#19)
 - [ ] JSON schema for all outputs (#13)
-- [ ] Error code reference (#12)
 
-### 4. Code Quality
+### 2. Code Quality (Parallel)
 - [ ] Dead code linting in CI (#3)
 - [ ] Lint rules enforced (#4)
 - [ ] Realistic mock data for tests (#17)
 
-### 5. Distribution
+### 3. CLI Improvements (Sequential)
 - [ ] Move config to ~/.mmoney (#15)
-- [ ] Publish read-only version to PyPI (#1)
+- [ ] Add type hints (#6)
+- [ ] Add logging (#8)
+- [ ] Improve error handling (#9)
+
+### 4. Distribution
+- [ ] Publish to PyPI (#1)
+
+### 5. Future (After v1)
+- [ ] Refactor cli.py into modules (#7)
 
 ---
 
@@ -103,7 +139,7 @@ This CLI is designed primarily for AI agent consumption. Priorities are set acco
 
 ## Mutation Commands (Gated in v1)
 
-These commands will be disabled or removed in the initial release:
+These commands are disabled by default (use `--allow-mutations` to enable):
 
 - `accounts create` / `update` / `delete`
 - `transactions create` / `update` / `delete` / `split`
