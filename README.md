@@ -11,17 +11,22 @@ Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchm
 ## Installation
 
 ```bash
-# One-liner (recommended - works on macOS, Linux, Windows)
-pipx install mmoney
-
-# Alternative: Using uv
-uv tool install mmoney
-
-# Alternative: Using pip (may require adding to PATH)
-pip install mmoney
+# One-liner install (recommended - prompts to install uv or pipx if needed)
+curl -sSL https://raw.githubusercontent.com/theFong/mmoney-cli/main/install.sh | bash
 ```
 
-> **Note:** `pipx` and `uv tool` automatically handle PATH setup. If using `pip` and `mmoney` isn't found, you may need to add Python's bin directory to your PATH or use `python -m mmoney_cli.cli` instead.
+Or install directly if you have a package manager:
+
+```bash
+# Using uv (fast, modern)
+uv tool install mmoney
+
+# Using pipx (stable, widely used)
+pipx install mmoney
+
+# Using pip (may require PATH setup)
+pip install mmoney
+```
 
 ## Development
 
