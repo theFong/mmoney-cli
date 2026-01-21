@@ -87,6 +87,7 @@ class TestAuthErrors:
                 email="test@example.com",
                 password="password123",
                 mfa_secret_key="JBSWY3DPEHPK3PXP",
+                save_session=False,
             )
 
     def test_login_network_error(self, runner):
