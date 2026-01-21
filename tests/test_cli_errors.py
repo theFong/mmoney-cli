@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from click.testing import CliRunner
 
-from mmoney_cli.cli import cli, output_json, get_client, run_async
+from mmoney_cli.cli import cli, output_json, output_error, get_client, run_async, ExitCode, ErrorCode
 
 
 @pytest.fixture
@@ -36,9 +36,11 @@ class TestAuthErrors:
                 ["auth", "login", "--no-interactive", "-e", "bad@email.com", "-p", "wrongpass"],
             )
 
-            assert result.exit_code == 1
-            assert "Login failed" in result.output
-            assert "Invalid email or password" in result.output
+            assert result.exit_code == 2  # AUTH_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "AUTH_FAILED"
+            assert "Login failed" in error["error"]["message"]
+            assert "Invalid email or password" in error["error"]["details"]
 
     def test_login_mfa_wrong_code(self, runner):
         """Test login with wrong MFA code."""
@@ -54,8 +56,10 @@ class TestAuthErrors:
                 ["auth", "login", "--mfa-code", "000000", "-e", "test@example.com", "-p", "pass"],
             )
 
-            assert result.exit_code == 1
-            assert "MFA login failed" in result.output
+            assert result.exit_code == 2  # AUTH_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "AUTH_MFA_FAILED"
+            assert "MFA login failed" in error["error"]["message"]
 
     def test_login_with_mfa_secret(self, runner):
         """Test login with MFA secret (TOTP)."""
@@ -96,8 +100,10 @@ class TestAuthErrors:
                 ["auth", "login", "--no-interactive", "-e", "test@example.com", "-p", "pass"],
             )
 
-            assert result.exit_code == 1
-            assert "Login failed" in result.output
+            assert result.exit_code == 2  # AUTH_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "AUTH_FAILED"
+            assert "Login failed" in error["error"]["message"]
 
     def test_auth_status_no_token(self, runner):
         """Test auth status when session exists but no token."""
@@ -690,23 +696,27 @@ class TestReadOnlyMode:
             ],
         )
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
-        assert "--allow-mutations" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
+        assert "This command modifies data" in error["error"]["message"]
+        assert "--allow-mutations" in error["error"]["details"]
 
     def test_accounts_update_blocked_without_flag(self, runner):
         """Test accounts update is blocked without --allow-mutations."""
         result = runner.invoke(cli, ["accounts", "update", "123", "--name", "New Name"])
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_accounts_delete_blocked_without_flag(self, runner):
         """Test accounts delete is blocked without --allow-mutations."""
         result = runner.invoke(cli, ["accounts", "delete", "123", "--yes"])
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_transactions_create_blocked_without_flag(self, runner):
         """Test transactions create is blocked without --allow-mutations."""
@@ -722,8 +732,9 @@ class TestReadOnlyMode:
             ],
         )
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_transactions_update_blocked_without_flag(self, runner):
         """Test transactions update is blocked without --allow-mutations."""
@@ -732,15 +743,17 @@ class TestReadOnlyMode:
             ["transactions", "update", "txn_001", "--merchant", "New Merchant"],
         )
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_transactions_delete_blocked_without_flag(self, runner):
         """Test transactions delete is blocked without --allow-mutations."""
         result = runner.invoke(cli, ["transactions", "delete", "txn_001", "--yes"])
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_categories_create_blocked_without_flag(self, runner):
         """Test categories create is blocked without --allow-mutations."""
@@ -749,22 +762,25 @@ class TestReadOnlyMode:
             ["categories", "create", "--group-id", "grp_001", "--name", "New Category"],
         )
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_categories_delete_blocked_without_flag(self, runner):
         """Test categories delete is blocked without --allow-mutations."""
         result = runner.invoke(cli, ["categories", "delete", "cat_001", "--yes"])
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_tags_create_blocked_without_flag(self, runner):
         """Test tags create is blocked without --allow-mutations."""
         result = runner.invoke(cli, ["tags", "create", "--name", "New Tag"])
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_tags_set_blocked_without_flag(self, runner):
         """Test tags set is blocked without --allow-mutations."""
@@ -773,8 +789,9 @@ class TestReadOnlyMode:
             ["tags", "set", "txn_001", "--tag-id", "tag_001"],
         )
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_budgets_set_blocked_without_flag(self, runner):
         """Test budgets set is blocked without --allow-mutations."""
@@ -783,8 +800,9 @@ class TestReadOnlyMode:
             ["budgets", "set", "--amount", "500", "--category-id", "cat_001"],
         )
 
-        assert result.exit_code == 1
-        assert "This command modifies data" in result.output
+        assert result.exit_code == 6  # MUTATION_BLOCKED
+        error = json.loads(result.output)
+        assert error["error"]["code"] == "MUTATION_BLOCKED"
 
     def test_read_commands_work_without_flag(self, runner):
         """Test that read-only commands work without --allow-mutations."""
@@ -796,3 +814,104 @@ class TestReadOnlyMode:
             result = runner.invoke(cli, ["accounts", "list"])
 
             assert result.exit_code == 0
+
+
+# ============================================================================
+# Exit Codes and Error Codes Tests
+# ============================================================================
+
+
+class TestExitCodes:
+    """Tests for exit code constants."""
+
+    def test_exit_codes_defined(self):
+        """Test that all exit codes are defined."""
+        assert ExitCode.SUCCESS == 0
+        assert ExitCode.GENERAL_ERROR == 1
+        assert ExitCode.AUTH_ERROR == 2
+        assert ExitCode.NOT_FOUND == 3
+        assert ExitCode.VALIDATION_ERROR == 4
+        assert ExitCode.API_ERROR == 5
+        assert ExitCode.MUTATION_BLOCKED == 6
+
+    def test_exit_codes_unique(self):
+        """Test that exit codes are unique."""
+        codes = [
+            ExitCode.SUCCESS,
+            ExitCode.GENERAL_ERROR,
+            ExitCode.AUTH_ERROR,
+            ExitCode.NOT_FOUND,
+            ExitCode.VALIDATION_ERROR,
+            ExitCode.API_ERROR,
+            ExitCode.MUTATION_BLOCKED,
+        ]
+        assert len(codes) == len(set(codes))
+
+
+class TestErrorCodes:
+    """Tests for error code constants."""
+
+    def test_auth_error_codes_defined(self):
+        """Test that auth error codes are defined."""
+        assert ErrorCode.AUTH_REQUIRED == "AUTH_REQUIRED"
+        assert ErrorCode.AUTH_FAILED == "AUTH_FAILED"
+        assert ErrorCode.AUTH_MFA_REQUIRED == "AUTH_MFA_REQUIRED"
+        assert ErrorCode.AUTH_MFA_FAILED == "AUTH_MFA_FAILED"
+        assert ErrorCode.AUTH_INVALID_TOKEN == "AUTH_INVALID_TOKEN"
+
+    def test_validation_error_codes_defined(self):
+        """Test that validation error codes are defined."""
+        assert ErrorCode.VALIDATION_MISSING_FIELD == "VALIDATION_MISSING_FIELD"
+        assert ErrorCode.VALIDATION_INVALID_VALUE == "VALIDATION_INVALID_VALUE"
+        assert ErrorCode.VALIDATION_INVALID_DATE == "VALIDATION_INVALID_DATE"
+
+    def test_api_error_codes_defined(self):
+        """Test that API error codes are defined."""
+        assert ErrorCode.API_ERROR == "API_ERROR"
+        assert ErrorCode.API_TIMEOUT == "API_TIMEOUT"
+        assert ErrorCode.API_RATE_LIMIT == "API_RATE_LIMIT"
+
+    def test_resource_error_codes_defined(self):
+        """Test that resource error codes are defined."""
+        assert ErrorCode.NOT_FOUND == "NOT_FOUND"
+        assert ErrorCode.ALREADY_EXISTS == "ALREADY_EXISTS"
+
+    def test_permission_error_codes_defined(self):
+        """Test that permission error codes are defined."""
+        assert ErrorCode.MUTATION_BLOCKED == "MUTATION_BLOCKED"
+
+
+class TestOutputError:
+    """Tests for the output_error function."""
+
+    def test_output_error_format(self, capsys):
+        """Test that output_error produces correct JSON format."""
+        with pytest.raises(SystemExit) as excinfo:
+            output_error(
+                code="TEST_ERROR",
+                message="Test message",
+                details="Test details",
+                exit_code=42,
+            )
+
+        assert excinfo.value.code == 42
+        captured = capsys.readouterr()
+        error = json.loads(captured.err)
+        assert error["error"]["code"] == "TEST_ERROR"
+        assert error["error"]["message"] == "Test message"
+        assert error["error"]["details"] == "Test details"
+
+    def test_output_error_without_details(self, capsys):
+        """Test output_error without details."""
+        with pytest.raises(SystemExit):
+            output_error(
+                code="TEST_ERROR",
+                message="Test message",
+                exit_code=1,
+            )
+
+        captured = capsys.readouterr()
+        error = json.loads(captured.err)
+        assert "details" not in error["error"]
+        assert error["error"]["code"] == "TEST_ERROR"
+        assert error["error"]["message"] == "Test message"

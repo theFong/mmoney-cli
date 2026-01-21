@@ -69,8 +69,10 @@ class TestAuthCommands:
 
             result = runner.invoke(cli, ["auth", "login", "--mfa-code", "123456"])
 
-            assert result.exit_code == 1
-            assert "--email and --password required" in result.output
+            assert result.exit_code == 4  # VALIDATION_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "VALIDATION_MISSING_FIELD"
+            assert "--email and --password required" in error["error"]["message"]
 
     def test_auth_login_with_device_uuid(self, runner):
         """Test login with device UUID."""
@@ -102,8 +104,10 @@ class TestAuthCommands:
 
             result = runner.invoke(cli, ["auth", "login", "--no-interactive"])
 
-            assert result.exit_code == 1
-            assert "--email and --password required" in result.output
+            assert result.exit_code == 4  # VALIDATION_ERROR
+            error = json.loads(result.output)
+            assert error["error"]["code"] == "VALIDATION_MISSING_FIELD"
+            assert "--email and --password required" in error["error"]["message"]
 
     def test_auth_logout(self, runner):
         """Test logout command."""

@@ -18,6 +18,86 @@ from monarchmoney import MonarchMoney
 __version__ = "0.1.0"
 
 
+# ============================================================================
+# Exit Codes
+# ============================================================================
+
+class ExitCode:
+    """Standard exit codes for agent-friendly error handling."""
+    SUCCESS = 0
+    GENERAL_ERROR = 1
+    AUTH_ERROR = 2
+    NOT_FOUND = 3
+    VALIDATION_ERROR = 4
+    API_ERROR = 5
+    MUTATION_BLOCKED = 6
+
+
+# ============================================================================
+# Error Codes
+# ============================================================================
+
+class ErrorCode:
+    """Error codes for structured error responses."""
+    # Authentication errors
+    AUTH_REQUIRED = "AUTH_REQUIRED"
+    AUTH_FAILED = "AUTH_FAILED"
+    AUTH_MFA_REQUIRED = "AUTH_MFA_REQUIRED"
+    AUTH_MFA_FAILED = "AUTH_MFA_FAILED"
+    AUTH_INVALID_TOKEN = "AUTH_INVALID_TOKEN"
+
+    # Validation errors
+    VALIDATION_MISSING_FIELD = "VALIDATION_MISSING_FIELD"
+    VALIDATION_INVALID_VALUE = "VALIDATION_INVALID_VALUE"
+    VALIDATION_INVALID_DATE = "VALIDATION_INVALID_DATE"
+
+    # API errors
+    API_ERROR = "API_ERROR"
+    API_TIMEOUT = "API_TIMEOUT"
+    API_RATE_LIMIT = "API_RATE_LIMIT"
+
+    # Resource errors
+    NOT_FOUND = "NOT_FOUND"
+    ALREADY_EXISTS = "ALREADY_EXISTS"
+
+    # Permission errors
+    MUTATION_BLOCKED = "MUTATION_BLOCKED"
+
+    # General errors
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
+
+
+def output_error(code: str, message: str, details: str = None, exit_code: int = ExitCode.GENERAL_ERROR):
+    """Output a structured error and exit.
+
+    Args:
+        code: Machine-readable error code (e.g., "AUTH_REQUIRED")
+        message: Human-readable error message
+        details: Optional additional details or suggestions
+        exit_code: Process exit code (default: 1)
+
+    Output format:
+        {
+            "error": {
+                "code": "AUTH_REQUIRED",
+                "message": "Authentication required",
+                "details": "Run 'mmoney auth login' first."
+            }
+        }
+    """
+    error_data = {
+        "error": {
+            "code": code,
+            "message": message,
+        }
+    }
+    if details:
+        error_data["error"]["details"] = details
+
+    click.echo(json.dumps(error_data, indent=2), err=True)
+    sys.exit(exit_code)
+
+
 def output_json(data, pretty=True):
     """Output data as JSON."""
     if pretty:
@@ -55,12 +135,12 @@ def require_mutations(f):
         while root.parent:
             root = root.parent
         if not (root.obj or {}).get(_ALLOW_MUTATIONS, False):
-            click.echo(
-                "Error: This command modifies data. Use --allow-mutations to enable.\n"
-                "Example: mmoney --allow-mutations accounts create ...",
-                err=True,
+            output_error(
+                code=ErrorCode.MUTATION_BLOCKED,
+                message="This command modifies data. Use --allow-mutations to enable.",
+                details="Example: mmoney --allow-mutations accounts create ...",
+                exit_code=ExitCode.MUTATION_BLOCKED,
             )
-            sys.exit(1)
         return f(*args, **kwargs)
     return wrapper
 
@@ -165,11 +245,12 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
     if mfa_code:
         # One-time MFA code login
         if not email or not password:
-            click.echo(
-                "Error: --email and --password required with --mfa-code",
-                err=True,
+            output_error(
+                code=ErrorCode.VALIDATION_MISSING_FIELD,
+                message="--email and --password required with --mfa-code",
+                details="Provide both email and password when using MFA code authentication.",
+                exit_code=ExitCode.VALIDATION_ERROR,
             )
-            sys.exit(1)
         try:
             run_async(
                 mm.multi_factor_authenticate(
@@ -178,24 +259,33 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             )
             mm.save_session()
         except Exception as e:
-            click.echo(f"MFA login failed: {e}", err=True)
-            sys.exit(1)
+            output_error(
+                code=ErrorCode.AUTH_MFA_FAILED,
+                message="MFA login failed",
+                details=str(e),
+                exit_code=ExitCode.AUTH_ERROR,
+            )
     elif interactive:
         run_async(mm.interactive_login())
     else:
         if not email or not password:
-            click.echo(
-                "Error: --email and --password required for non-interactive login",
-                err=True,
+            output_error(
+                code=ErrorCode.VALIDATION_MISSING_FIELD,
+                message="--email and --password required for non-interactive login",
+                details="Provide both email and password for non-interactive authentication.",
+                exit_code=ExitCode.VALIDATION_ERROR,
             )
-            sys.exit(1)
         try:
             run_async(
                 mm.login(email=email, password=password, mfa_secret_key=mfa_secret)
             )
         except Exception as e:
-            click.echo(f"Login failed: {e}", err=True)
-            sys.exit(1)
+            output_error(
+                code=ErrorCode.AUTH_FAILED,
+                message="Login failed",
+                details=str(e),
+                exit_code=ExitCode.AUTH_ERROR,
+            )
 
     click.echo("Login successful!")
 
