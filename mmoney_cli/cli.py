@@ -2,16 +2,163 @@
 """Monarch Money CLI - Command line interface for the Monarch Money API."""
 
 import asyncio
+import csv
+import functools
+import io
 import json
 import sys
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 
 import click
+
+# Context keys
+_ALLOW_MUTATIONS = "allow_mutations"
+_OUTPUT_FORMAT = "output_format"
 
 from monarchmoney import MonarchMoney
 
 __version__ = "0.1.0"
+
+
+# ============================================================================
+# Exit Codes
+# ============================================================================
+
+class ExitCode:
+    """Standard exit codes for agent-friendly error handling."""
+    SUCCESS = 0
+    GENERAL_ERROR = 1
+    AUTH_ERROR = 2
+    NOT_FOUND = 3
+    VALIDATION_ERROR = 4
+    API_ERROR = 5
+    MUTATION_BLOCKED = 6
+
+
+# ============================================================================
+# Error Codes
+# ============================================================================
+
+class ErrorCode:
+    """Error codes for structured error responses."""
+    # Authentication errors
+    AUTH_REQUIRED = "AUTH_REQUIRED"
+    AUTH_FAILED = "AUTH_FAILED"
+    AUTH_MFA_REQUIRED = "AUTH_MFA_REQUIRED"
+    AUTH_MFA_FAILED = "AUTH_MFA_FAILED"
+    AUTH_INVALID_TOKEN = "AUTH_INVALID_TOKEN"
+
+    # Validation errors
+    VALIDATION_MISSING_FIELD = "VALIDATION_MISSING_FIELD"
+    VALIDATION_INVALID_VALUE = "VALIDATION_INVALID_VALUE"
+    VALIDATION_INVALID_DATE = "VALIDATION_INVALID_DATE"
+
+    # API errors
+    API_ERROR = "API_ERROR"
+    API_TIMEOUT = "API_TIMEOUT"
+    API_RATE_LIMIT = "API_RATE_LIMIT"
+
+    # Resource errors
+    NOT_FOUND = "NOT_FOUND"
+    ALREADY_EXISTS = "ALREADY_EXISTS"
+
+    # Permission errors
+    MUTATION_BLOCKED = "MUTATION_BLOCKED"
+
+    # General errors
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
+
+
+def output_error(code: str, message: str, details: str = None, exit_code: int = ExitCode.GENERAL_ERROR):
+    """Output a structured error and exit.
+
+    Args:
+        code: Machine-readable error code (e.g., "AUTH_REQUIRED")
+        message: Human-readable error message
+        details: Optional additional details or suggestions
+        exit_code: Process exit code (default: 1)
+
+    Output format:
+        {
+            "error": {
+                "code": "AUTH_REQUIRED",
+                "message": "Authentication required",
+                "details": "Run 'mmoney auth login' first."
+            }
+        }
+    """
+    error_data = {
+        "error": {
+            "code": code,
+            "message": message,
+        }
+    }
+    if details:
+        error_data["error"]["details"] = details
+
+    click.echo(json.dumps(error_data, indent=2), err=True)
+    sys.exit(exit_code)
+
+
+# ============================================================================
+# Output Formats
+# ============================================================================
+
+
+class OutputFormat:
+    """Available output formats."""
+    JSON = "json"
+    JSONL = "jsonl"
+    CSV = "csv"
+    TEXT = "text"
+
+
+def _flatten_dict(d: Dict, parent_key: str = "", sep: str = ".") -> Dict:
+    """Flatten nested dictionary for CSV/text output."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(_flatten_dict(v, new_key, sep).items())
+        elif isinstance(v, list):
+            # Convert list to string representation
+            items.append((new_key, json.dumps(v, default=str) if v else ""))
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def _extract_records(data: Any, key_hint: str = None) -> List[Dict]:
+    """Extract a list of records from API response for tabular output.
+
+    Handles common API response patterns:
+    - {"accounts": [...]} -> [...]
+    - {"allTransactions": {"results": [...]}} -> [...]
+    - {...} -> [{...}]
+    """
+    if isinstance(data, list):
+        return data
+
+    if isinstance(data, dict):
+        # Try common keys that contain record lists
+        list_keys = [
+            "accounts", "results", "transactions", "categories",
+            "householdTransactionTags", "credentials", "budgetData",
+            "recurringTransactions", "splits", "snapshots", "history"
+        ]
+
+        # Check for nested results (e.g., allTransactions.results)
+        for key, value in data.items():
+            if isinstance(value, dict) and "results" in value:
+                return value["results"]
+            if key in list_keys and isinstance(value, list):
+                return value
+
+        # Single record - wrap in list
+        return [data]
+
+    return []
 
 
 def output_json(data, pretty=True):
@@ -20,6 +167,78 @@ def output_json(data, pretty=True):
         click.echo(json.dumps(data, indent=2, default=str))
     else:
         click.echo(json.dumps(data, default=str))
+
+
+def output_jsonl(data: Any):
+    """Output data as JSON Lines (one JSON object per line).
+
+    Good for streaming and line-by-line processing.
+    """
+    records = _extract_records(data)
+    for record in records:
+        click.echo(json.dumps(record, default=str))
+
+
+def output_csv(data: Any):
+    """Output data as CSV.
+
+    Good for tabular data like transactions and accounts.
+    """
+    records = _extract_records(data)
+    if not records:
+        return
+
+    # Flatten all records to get all possible keys
+    flattened = [_flatten_dict(r) if isinstance(r, dict) else {"value": r} for r in records]
+
+    # Collect all keys from all records
+    all_keys = set()
+    for record in flattened:
+        all_keys.update(record.keys())
+    fieldnames = sorted(all_keys)
+
+    # Write CSV
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for record in flattened:
+        writer.writerow({k: str(v) if v is not None else "" for k, v in record.items()})
+
+    click.echo(output.getvalue().rstrip())
+
+
+def output_text(data: Any):
+    """Output data as simple key=value text.
+
+    Good for grep/awk and simple extraction.
+    """
+    records = _extract_records(data)
+    for i, record in enumerate(records):
+        if i > 0:
+            click.echo("---")  # Record separator
+        if isinstance(record, dict):
+            flat = _flatten_dict(record)
+            for key, value in sorted(flat.items()):
+                click.echo(f"{key}={value if value is not None else ''}")
+        else:
+            click.echo(str(record))
+
+
+def output_data(data: Any, format: str = OutputFormat.JSON):
+    """Output data in the specified format.
+
+    Args:
+        data: Data to output (usually API response dict)
+        format: Output format (json, jsonl, csv, text)
+    """
+    if format == OutputFormat.JSONL:
+        output_jsonl(data)
+    elif format == OutputFormat.CSV:
+        output_csv(data)
+    elif format == OutputFormat.TEXT:
+        output_text(data)
+    else:
+        output_json(data)
 
 
 def run_async(coro):
@@ -37,6 +256,45 @@ def get_client():
     return mm
 
 
+def get_output_format() -> str:
+    """Get the output format from the current Click context."""
+    ctx = click.get_current_context()
+    # Walk up to root context to get format
+    root = ctx
+    while root.parent:
+        root = root.parent
+    return (root.obj or {}).get(_OUTPUT_FORMAT, OutputFormat.TEXT)
+
+
+def output_result(data: Any):
+    """Output result in the format specified by --format option."""
+    output_data(data, get_output_format())
+
+
+def require_mutations(f):
+    """Decorator that blocks mutation commands in read-only mode.
+
+    Apply this to any command that creates, updates, or deletes data.
+    Users must pass --allow-mutations to use these commands.
+    """
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        ctx = click.get_current_context()
+        # Walk up to root context to get allow_mutations flag
+        root = ctx
+        while root.parent:
+            root = root.parent
+        if not (root.obj or {}).get(_ALLOW_MUTATIONS, False):
+            output_error(
+                code=ErrorCode.MUTATION_BLOCKED,
+                message="This command modifies data. Use --allow-mutations to enable.",
+                details="Example: mmoney --allow-mutations accounts create ...",
+                exit_code=ExitCode.MUTATION_BLOCKED,
+            )
+        return f(*args, **kwargs)
+    return wrapper
+
+
 # ============================================================================
 # Main CLI Group
 # ============================================================================
@@ -44,12 +302,37 @@ def get_client():
 
 @click.group()
 @click.version_option(version=__version__, prog_name="mmoney")
-def cli():
+@click.option(
+    "--allow-mutations",
+    is_flag=True,
+    default=False,
+    help="Enable commands that modify data (create, update, delete). Default: read-only.",
+)
+@click.option(
+    "--format", "-f",
+    type=click.Choice(["json", "jsonl", "csv", "text"]),
+    default="text",
+    help="Output format: text (default, key=value), json, jsonl (streaming), csv (tabular).",
+)
+@click.pass_context
+def cli(ctx, allow_mutations, format):
     """Monarch Money CLI - Access your financial data from the command line.
 
     Built on top of the monarchmoneycommunity library.
+
+    By default, runs in READ-ONLY mode for safety (ideal for AI agents).
+    Use --allow-mutations to enable commands that modify data.
+
+    \b
+    OUTPUT FORMATS:
+    - text: Key=value pairs (default, simple extraction, grep/awk)
+    - json: Pretty-printed JSON (nested data, backward compatible)
+    - jsonl: One JSON object per line (streaming, line processing)
+    - csv: Comma-separated values (tabular data, spreadsheets)
     """
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj[_ALLOW_MUTATIONS] = allow_mutations
+    ctx.obj[_OUTPUT_FORMAT] = format
 
 
 # ============================================================================
@@ -126,11 +409,12 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
     if mfa_code:
         # One-time MFA code login
         if not email or not password:
-            click.echo(
-                "Error: --email and --password required with --mfa-code",
-                err=True,
+            output_error(
+                code=ErrorCode.VALIDATION_MISSING_FIELD,
+                message="--email and --password required with --mfa-code",
+                details="Provide both email and password when using MFA code authentication.",
+                exit_code=ExitCode.VALIDATION_ERROR,
             )
-            sys.exit(1)
         try:
             run_async(
                 mm.multi_factor_authenticate(
@@ -139,24 +423,33 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             )
             mm.save_session()
         except Exception as e:
-            click.echo(f"MFA login failed: {e}", err=True)
-            sys.exit(1)
+            output_error(
+                code=ErrorCode.AUTH_MFA_FAILED,
+                message="MFA login failed",
+                details=str(e),
+                exit_code=ExitCode.AUTH_ERROR,
+            )
     elif interactive:
         run_async(mm.interactive_login())
     else:
         if not email or not password:
-            click.echo(
-                "Error: --email and --password required for non-interactive login",
-                err=True,
+            output_error(
+                code=ErrorCode.VALIDATION_MISSING_FIELD,
+                message="--email and --password required for non-interactive login",
+                details="Provide both email and password for non-interactive authentication.",
+                exit_code=ExitCode.VALIDATION_ERROR,
             )
-            sys.exit(1)
         try:
             run_async(
                 mm.login(email=email, password=password, mfa_secret_key=mfa_secret)
             )
         except Exception as e:
-            click.echo(f"Login failed: {e}", err=True)
-            sys.exit(1)
+            output_error(
+                code=ErrorCode.AUTH_FAILED,
+                message="Login failed",
+                details=str(e),
+                exit_code=ExitCode.AUTH_ERROR,
+            )
 
     click.echo("Login successful!")
 
@@ -199,7 +492,7 @@ def accounts_list():
     """List all accounts."""
     mm = get_client()
     result = run_async(mm.get_accounts())
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("types")
@@ -207,7 +500,7 @@ def accounts_types():
     """List available account types."""
     mm = get_client()
     result = run_async(mm.get_account_type_options())
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("create")
@@ -218,6 +511,7 @@ def accounts_types():
 @click.option(
     "--in-net-worth/--not-in-net-worth", default=True, help="Include in net worth"
 )
+@require_mutations
 def accounts_create(name, account_type, subtype, balance, in_net_worth):
     """Create a manual account."""
     mm = get_client()
@@ -230,7 +524,7 @@ def accounts_create(name, account_type, subtype, balance, in_net_worth):
             account_balance=balance,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("update")
@@ -242,6 +536,7 @@ def accounts_create(name, account_type, subtype, balance, in_net_worth):
 @click.option("--in-net-worth", type=bool, help="Include in net worth")
 @click.option("--hide-from-summary", type=bool, help="Hide from summary list")
 @click.option("--hide-transactions", type=bool, help="Hide transactions from reports")
+@require_mutations
 def accounts_update(
     account_id,
     name,
@@ -266,17 +561,18 @@ def accounts_update(
             hide_transactions_from_reports=hide_transactions,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("delete")
 @click.argument("account_id")
 @click.confirmation_option(prompt="Are you sure you want to delete this account?")
+@require_mutations
 def accounts_delete(account_id):
     """Delete an account."""
     mm = get_client()
     result = run_async(mm.delete_account(account_id))
-    output_json(result)
+    output_result(result)
 
 
 @accounts.command("refresh")
@@ -327,7 +623,7 @@ def holdings_list(account_id):
     """List holdings for an account."""
     mm = get_client()
     result = run_async(mm.get_account_holdings(int(account_id)))
-    output_json(result)
+    output_result(result)
 
 
 @holdings.command("history")
@@ -336,7 +632,7 @@ def holdings_history(account_id):
     """Get account balance history."""
     mm = get_client()
     result = run_async(mm.get_account_history(int(account_id)))
-    output_json(result)
+    output_result(result)
 
 
 @holdings.command("snapshots")
@@ -355,7 +651,7 @@ def holdings_snapshots(start_date, end_date, account_type):
             start_date=start, end_date=end, account_type=account_type
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @holdings.command("balances")
@@ -364,7 +660,7 @@ def holdings_balances(start_date):
     """Get recent account balances."""
     mm = get_client()
     result = run_async(mm.get_recent_account_balances(start_date=start_date))
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -423,7 +719,7 @@ def transactions_list(
             is_recurring=is_recurring,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("get")
@@ -432,7 +728,7 @@ def transactions_get(transaction_id):
     """Get transaction details."""
     mm = get_client()
     result = run_async(mm.get_transaction_details(transaction_id))
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("summary")
@@ -440,7 +736,7 @@ def transactions_summary():
     """Get transactions summary."""
     mm = get_client()
     result = run_async(mm.get_transactions_summary())
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("splits")
@@ -449,7 +745,7 @@ def transactions_splits(transaction_id):
     """Get transaction splits."""
     mm = get_client()
     result = run_async(mm.get_transaction_splits(transaction_id))
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("create")
@@ -464,6 +760,7 @@ def transactions_splits(transaction_id):
 @click.option(
     "--update-balance/--no-update-balance", default=False, help="Update account balance"
 )
+@require_mutations
 def transactions_create(
     date, account_id, amount, merchant, category_id, notes, update_balance
 ):
@@ -480,7 +777,7 @@ def transactions_create(
             update_balance=update_balance,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("update")
@@ -492,6 +789,7 @@ def transactions_create(
 @click.option("--notes", "-n", help="Notes")
 @click.option("--hide-from-reports", type=bool, help="Hide from reports")
 @click.option("--needs-review", type=bool, help="Needs review flag")
+@require_mutations
 def transactions_update(
     transaction_id,
     category_id,
@@ -516,12 +814,13 @@ def transactions_update(
             needs_review=needs_review,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @transactions.command("delete")
 @click.argument("transaction_id")
 @click.confirmation_option(prompt="Are you sure you want to delete this transaction?")
+@require_mutations
 def transactions_delete(transaction_id):
     """Delete a transaction."""
     mm = get_client()
@@ -545,7 +844,7 @@ def categories_list():
     """List all categories."""
     mm = get_client()
     result = run_async(mm.get_transaction_categories())
-    output_json(result)
+    output_result(result)
 
 
 @categories.command("groups")
@@ -553,7 +852,7 @@ def categories_groups():
     """List category groups."""
     mm = get_client()
     result = run_async(mm.get_transaction_category_groups())
-    output_json(result)
+    output_result(result)
 
 
 @categories.command("create")
@@ -561,6 +860,7 @@ def categories_groups():
 @click.option("--name", "-n", required=True, help="Category name")
 @click.option("--icon", default="❓", help="Category icon")
 @click.option("--rollover/--no-rollover", default=False, help="Enable rollover")
+@require_mutations
 def categories_create(group_id, name, icon, rollover):
     """Create a category."""
     mm = get_client()
@@ -572,12 +872,13 @@ def categories_create(group_id, name, icon, rollover):
             rollover_enabled=rollover,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 @categories.command("delete")
 @click.argument("category_id")
 @click.confirmation_option(prompt="Are you sure you want to delete this category?")
+@require_mutations
 def categories_delete(category_id):
     """Delete a category."""
     mm = get_client()
@@ -601,29 +902,31 @@ def tags_list():
     """List all tags."""
     mm = get_client()
     result = run_async(mm.get_transaction_tags())
-    output_json(result)
+    output_result(result)
 
 
 @tags.command("create")
 @click.option("--name", "-n", required=True, help="Tag name")
 @click.option("--color", "-c", default="blue", help="Tag color")
+@require_mutations
 def tags_create(name, color):
     """Create a tag."""
     mm = get_client()
     result = run_async(mm.create_transaction_tag(name=name, color=color))
-    output_json(result)
+    output_result(result)
 
 
 @tags.command("set")
 @click.argument("transaction_id")
 @click.option("--tag-id", "-t", multiple=True, required=True, help="Tag IDs to set")
+@require_mutations
 def tags_set(transaction_id, tag_id):
     """Set tags on a transaction."""
     mm = get_client()
     result = run_async(
         mm.set_transaction_tags(transaction_id=transaction_id, tag_ids=list(tag_id))
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -644,7 +947,7 @@ def budgets_list(start_date, end_date):
     """List budgets."""
     mm = get_client()
     result = run_async(mm.get_budgets(start_date=start_date, end_date=end_date))
-    output_json(result)
+    output_result(result)
 
 
 @budgets.command("set")
@@ -658,6 +961,7 @@ def budgets_list(start_date, end_date):
     default=False,
     help="Apply to future months",
 )
+@require_mutations
 def budgets_set(
     amount, category_id, category_group_id, timeframe, start_date, apply_to_future
 ):
@@ -673,7 +977,7 @@ def budgets_set(
             apply_to_future=apply_to_future,
         )
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -697,7 +1001,7 @@ def cashflow_summary(start_date, end_date, limit):
     result = run_async(
         mm.get_cashflow_summary(limit=limit, start_date=start_date, end_date=end_date)
     )
-    output_json(result)
+    output_result(result)
 
 
 @cashflow.command("details")
@@ -710,7 +1014,7 @@ def cashflow_details(start_date, end_date, limit):
     result = run_async(
         mm.get_cashflow(limit=limit, start_date=start_date, end_date=end_date)
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -733,7 +1037,7 @@ def recurring_list(start_date, end_date):
     result = run_async(
         mm.get_recurring_transactions(start_date=start_date, end_date=end_date)
     )
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -752,7 +1056,7 @@ def institutions_list():
     """List linked institutions."""
     mm = get_client()
     result = run_async(mm.get_institutions())
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
@@ -771,7 +1075,7 @@ def subscription_status():
     """Get subscription details."""
     mm = get_client()
     result = run_async(mm.get_subscription_details())
-    output_json(result)
+    output_result(result)
 
 
 # ============================================================================
