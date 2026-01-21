@@ -76,13 +76,22 @@ def auth():
 def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, interactive):
     """Login to Monarch Money.
 
-    GETTING YOUR TOKEN FROM THE BROWSER:
+    GETTING YOUR TOKEN FROM THE BROWSER (Manual):
 
     \b
     1. Open https://app.monarchmoney.com and log in
     2. Open Chrome DevTools (F12 or Cmd+Option+I on Mac)
     3. Go to Application tab > Local Storage > https://app.monarchmoney.com
     4. Find 'accessToken' and copy its value (long string starting with letters/numbers)
+    5. Run: mmoney auth login --token YOUR_TOKEN
+
+    GETTING YOUR TOKEN (Programmatic via Console):
+
+    \b
+    1. Open https://app.monarchmoney.com and log in
+    2. Open Chrome DevTools Console (F12 > Console tab)
+    3. Run: copy(localStorage.getItem('accessToken'))
+    4. Token is now in your clipboard
     5. Run: mmoney auth login --token YOUR_TOKEN
 
     GETTING YOUR DEVICE UUID (for MFA bypass):
