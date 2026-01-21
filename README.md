@@ -7,7 +7,23 @@ Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchm
 ## Installation
 
 ```bash
+# Using uv (recommended)
+uv tool install mmoney-cli
+
+# Or using pip
 pip install mmoney-cli
+```
+
+## Development
+
+```bash
+# Clone and install with uv
+git clone https://github.com/theFong/mmoney-cli.git
+cd mmoney-cli
+uv sync
+
+# Run CLI
+uv run mmoney --help
 ```
 
 ## Quick Start
