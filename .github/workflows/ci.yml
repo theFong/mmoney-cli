@@ -33,6 +33,9 @@ jobs:
       - name: Run vulture (dead code detection)
         run: uv run vulture mmoney_cli --min-confidence 80
 
+      - name: Run pyright (type checking)
+        run: uv run pyright mmoney_cli/
+
   test:
     runs-on: ubuntu-latest
     strategy:
