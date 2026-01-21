@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mmoney-cli"
+version = "0.1.0"
+description = "CLI for Monarch Money - access your financial data from the command line"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Alec Fong", email = "alecfong1@gmail.com"}
+]
+keywords = ["monarch money", "cli", "finance", "personal finance", "budgeting"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "monarchmoneycommunity>=1.1.0",
+    "click>=8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+]
+
+[project.scripts]
+mmoney = "mmoney_cli.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/theFong/mmoney-cli"
+Repository = "https://github.com/theFong/mmoney-cli"
+Issues = "https://github.com/theFong/mmoney-cli/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
