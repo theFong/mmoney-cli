@@ -1,5 +1,7 @@
 # mmoney-cli
 
+![CI](https://github.com/theFong/mmoney-cli/actions/workflows/ci.yml/badge.svg)
+
 CLI for [Monarch Money](https://www.monarchmoney.com) - access your financial data from the command line.
 
 Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchmoneycommunity).
