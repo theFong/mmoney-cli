@@ -8,6 +8,11 @@ CLI for [Monarch Money](https://www.monarchmoney.com) - access your financial da
 
 Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchmoneycommunity).
 
+## Documentation
+
+- **[Command Reference](docs/commands.md)** - Complete guide to all commands
+- **[JSON Schemas](docs/schemas.md)** - Output schemas for agent integration
+
 ## Installation
 
 ```bash
