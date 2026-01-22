@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mmoney"
-version = "0.1.1"
+version = "0.1.2"
 description = "CLI for Monarch Money - access your financial data from the command line"
 readme = "README.md"
 license = {text = "MIT"}
@@ -41,6 +41,7 @@ dev = [
     "vulture>=2.13",
     "pre-commit>=4.0.0",
     "detect-secrets>=1.5.0",
+    "pyright>=1.1.0",
 ]
 
 [project.scripts]
@@ -83,3 +84,9 @@ known-first-party = ["mmoney_cli"]
 min_confidence = 80
 paths = ["mmoney_cli"]
 exclude = ["tests/"]
+
+[tool.pyright]
+pythonVersion = "3.9"
+typeCheckingMode = "standard"
+reportMissingImports = false
+reportMissingTypeStubs = false

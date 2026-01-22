@@ -8,31 +8,52 @@ CLI for [Monarch Money](https://www.monarchmoney.com) - access your financial da
 
 Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchmoneycommunity).
 
+## Documentation
+
+- **[Command Reference](docs/commands.md)** - Complete guide to all commands
+- **[JSON Schemas](docs/schemas.md)** - Output schemas for agent integration
+- **[Security](docs/SECURITY.md)** - Credential storage and AI agent safety
+
 ## Installation
 
 ```bash
-# One-liner (recommended - works on macOS, Linux, Windows)
-pipx install mmoney
-
-# Alternative: Using uv
-uv tool install mmoney
-
-# Alternative: Using pip (may require adding to PATH)
-pip install mmoney
+# One-liner install (recommended - prompts to install uv or pipx if needed)
+curl -sSL https://raw.githubusercontent.com/theFong/mmoney-cli/main/install.sh | bash
 ```
 
-> **Note:** `pipx` and `uv tool` automatically handle PATH setup. If using `pip` and `mmoney` isn't found, you may need to add Python's bin directory to your PATH or use `python -m mmoney_cli.cli` instead.
+Or install directly if you have a package manager:
+
+```bash
+# Using uv (fast, modern)
+uv tool install mmoney
+
+# Using pipx (stable, widely used)
+pipx install mmoney
+
+# Using pip (may require PATH setup)
+pip install mmoney
+```
 
 ## Development
 
 ```bash
-# Clone and install with uv
+# Clone the repo
 git clone https://github.com/theFong/mmoney-cli.git
 cd mmoney-cli
-uv sync
 
-# Run CLI
-uv run mmoney --help
+# Full setup (installs uv, deps, git hooks)
+./scripts/setup-dev.sh
+
+# Or use VS Code devcontainer (recommended)
+# Open in VS Code and click "Reopen in Container"
+```
+
+**Quick commands:**
+```bash
+uv run mmoney --help        # Run the CLI
+uv run pytest tests/        # Run tests
+./scripts/setup-dev.sh lint # Run all linters
+./scripts/setup-dev.sh test # Run tests
 ```
 
 ## Quick Start
@@ -152,6 +173,8 @@ mmoney accounts list | jq '.accounts[] | {name: .displayName, balance: .currentB
 ## Session Storage
 
 Sessions are stored securely using your system's keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Falls back to `~/.mmoney/session.pickle` if keychain is unavailable.
+
+**AI Agent Safety**: When using with Claude Code or other AI agents, your credentials remain secure - agents cannot access the OS keychain. See [Security](docs/SECURITY.md) for details.
 
 ## Authentication Methods
 
