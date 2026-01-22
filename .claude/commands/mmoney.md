@@ -25,25 +25,27 @@ Check status:
 mmoney auth status
 ```
 
+> **Security:** Use interactive mode (default) so passwords aren't logged to shell history. Only use `--no-interactive` with environment variables or secure credential injection.
+
 ### Method 1: Email + Password + MFA (Recommended)
 
 The most secure and longest-lasting method. Enable MFA on your Monarch account if not already enabled.
 
-**With MFA Secret (fully automated):**
-When setting up your authenticator app, copy the secret key shown alongside the QR code. This lets the CLI generate TOTP codes automatically.
+**Interactive login (prompts for password securely):**
 ```bash
-mmoney auth login -e EMAIL -p PASSWORD --mfa-secret YOUR_SECRET --no-interactive
+mmoney auth login -e EMAIL --mfa-secret YOUR_MFA_SECRET
+# or with one-time code:
+mmoney auth login -e EMAIL --mfa-code 123456
 ```
 
-**With MFA Code (manual entry):**
-If you don't have the MFA secret, use a 6-digit code from your authenticator app.
+**Non-interactive (for automation with secure credential injection):**
 ```bash
-mmoney auth login -e EMAIL -p PASSWORD --mfa-code 123456
+mmoney auth login -e "$EMAIL" -p "$PASSWORD" --mfa-secret "$MFA_SECRET" --no-interactive
 ```
 
 ### Method 2: Device ID (No MFA Required)
 
-If MFA is not enabled on your account, you can use a device ID from your browser to establish a trusted device. This avoids MFA prompts.
+If MFA is not enabled on your account, use a device ID from your browser to establish a trusted device.
 
 **Step 1: Get the device ID from browser**
 
@@ -57,9 +59,9 @@ localStorage.getItem('monarchDeviceUUID')
 mmoney config set device-id YOUR_DEVICE_UUID
 ```
 
-**Step 3: Login with just email + password**
+**Step 3: Login interactively (prompts for password)**
 ```bash
-mmoney auth login -e EMAIL -p PASSWORD --no-interactive
+mmoney auth login -e EMAIL
 ```
 
 The device ID persists in `~/.mmoney/config.json`, so future logins only need email + password.
