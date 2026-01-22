@@ -12,6 +12,7 @@ Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchm
 
 - **[Command Reference](docs/commands.md)** - Complete guide to all commands
 - **[JSON Schemas](docs/schemas.md)** - Output schemas for agent integration
+- **[Security](docs/SECURITY.md)** - Credential storage and AI agent safety
 
 ## Installation
 
@@ -172,6 +173,8 @@ mmoney accounts list | jq '.accounts[] | {name: .displayName, balance: .currentB
 ## Session Storage
 
 Sessions are stored securely using your system's keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Falls back to `~/.mmoney/session.pickle` if keychain is unavailable.
+
+**AI Agent Safety**: When using with Claude Code or other AI agents, your credentials remain secure - agents cannot access the OS keychain. See [Security](docs/SECURITY.md) for details.
 
 ## Authentication Methods
 
