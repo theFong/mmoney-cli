@@ -247,7 +247,9 @@ uv run pytest tests/        # Run tests
 
 1. Update version in `pyproject.toml`
 2. Commit and push to main
-3. Create release: `gh release create vX.Y.Z` (auto-publishes to PyPI)
+3. Either:
+   - **Create a GitHub release**: `gh release create vX.Y.Z` (auto-publishes to PyPI)
+   - **Manual**: [Run the publish workflow](https://github.com/theFong/mmoney-cli/actions/workflows/publish.yml)
 
 ## License
 
