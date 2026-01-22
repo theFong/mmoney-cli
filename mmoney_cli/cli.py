@@ -689,7 +689,11 @@ def config_set(key: str, value: str) -> None:
       2. Open DevTools Console (F12)
       3. Run: localStorage.getItem('monarchDeviceUUID')
 
-    With device-id set, login only needs email + password (no MFA):
+    Ways to avoid manual MFA entry:
+      - device-id: Device is trusted, no MFA needed
+      - --mfa-secret: CLI generates TOTP code automatically
+
+    With device-id set, login only needs email + password:
       mmoney auth login -e EMAIL -p PASSWORD --no-interactive
     """
     # Normalize key
