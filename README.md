@@ -4,77 +4,101 @@
 
 > **Disclaimer:** This is an unofficial, community-built CLI tool. It is not affiliated with, endorsed by, or supported by Monarch Money. Use at your own risk.
 
-CLI for [Monarch Money](https://www.monarchmoney.com) - access your financial data from the command line.
+CLI for [Monarch Money](https://www.monarchmoney.com) - access your financial data from the command line. Built for humans and AI agents.
 
 Built on top of [monarchmoneycommunity](https://github.com/bradleyseanf/monarchmoneycommunity).
 
-## Documentation
-
-- **[Command Reference](docs/commands.md)** - Complete guide to all commands
-- **[JSON Schemas](docs/schemas.md)** - Output schemas for agent integration
-- **[Security](docs/SECURITY.md)** - Credential storage and AI agent safety
-
-## Installation
-
-```bash
-# One-liner install (recommended - prompts to install uv or pipx if needed)
-curl -sSL https://raw.githubusercontent.com/theFong/mmoney-cli/main/install.sh | bash
-```
-
-Or install directly if you have a package manager:
-
-```bash
-# Using uv (fast, modern)
-uv tool install mmoney
-
-# Using pipx (stable, widely used)
-pipx install mmoney
-
-# Using pip (may require PATH setup)
-pip install mmoney
-```
-
-## Development
-
-```bash
-# Clone the repo
-git clone https://github.com/theFong/mmoney-cli.git
-cd mmoney-cli
-
-# Full setup (installs uv, deps, git hooks)
-./scripts/setup-dev.sh
-
-# Or use VS Code devcontainer (recommended)
-# Open in VS Code and click "Reopen in Container"
-```
-
-**Quick commands:**
-```bash
-uv run mmoney --help        # Run the CLI
-uv run pytest tests/        # Run tests
-./scripts/setup-dev.sh lint # Run all linters
-./scripts/setup-dev.sh test # Run tests
-```
-
 ## Quick Start
 
+### 1. Install
+
 ```bash
-# Best: Email + Password + MFA Secret (longest lasting, fully automated)
-# Enable MFA in Monarch settings, copy the secret key when setting up authenticator
-mmoney auth login -e your@email.com -p yourpassword --mfa-secret YOUR_SECRET --no-interactive
+# One-liner (recommended)
+curl -sSL https://raw.githubusercontent.com/theFong/mmoney-cli/main/install.sh | bash
 
-# Good: Email + Password + MFA Code (requires manual code entry)
-mmoney auth login -e your@email.com -p yourpassword --mfa-code 123456
+# Or with a package manager
+uv tool install mmoney      # fast, modern
+pipx install mmoney         # stable, widely used
+pip install mmoney          # may require PATH setup
+```
 
-# Alternative: Email + Password + Device UUID (requires browser)
-# 1. Open app.monarch.com, login, open DevTools Console
-# 2. Run: copy(localStorage.getItem('monarchDeviceUUID'))
-mmoney auth login -e your@email.com -p yourpassword --device-uuid YOUR_UUID --no-interactive
+### 2. Authenticate
 
-# Fallback: Token from browser (shortest lived)
-# 1. Open app.monarch.com, login, open DevTools Network tab
-# 2. Click any 'graphql' request, find 'Authorization: Token YOUR_TOKEN' in Headers
-mmoney auth login --token YOUR_TOKEN
+```bash
+# Interactive login (recommended - keeps password out of shell history)
+mmoney auth login
+
+# Or with MFA secret for full automation
+mmoney auth login -e your@email.com -p yourpassword --mfa-secret YOUR_SECRET
+```
+
+See [Authentication Methods](#authentication-methods) for all options.
+
+### 3. Use
+
+```bash
+mmoney accounts list                    # List all accounts
+mmoney transactions list --limit 10     # Recent transactions
+mmoney cashflow summary                 # Income, expenses, savings
+```
+
+## Claude Code Integration
+
+This CLI is designed for use with [Claude Code](https://claude.ai/claude-code) and other AI agents.
+
+### Install the Skill
+
+```bash
+mkdir -p .claude/commands
+curl -o .claude/commands/mmoney.md https://raw.githubusercontent.com/theFong/mmoney-cli/main/.claude/commands/mmoney.md
+```
+
+### Example Prompts
+
+Once installed, ask Claude Code:
+
+| You say | Claude runs |
+|---------|-------------|
+| "What's my account balance?" | `mmoney accounts list` |
+| "How much did I spend on groceries last month?" | `mmoney transactions list --search groceries --start-date ...` |
+| "Show my recurring transactions" | `mmoney recurring list` |
+| "What's my cashflow this month?" | `mmoney cashflow summary` |
+| "List my investment holdings" | `mmoney holdings list` |
+
+### Security with AI Agents
+
+Your credentials are safe when using Claude Code:
+- Tokens stored in OS keychain (not accessible to agents)
+- Passwords entered interactively (not in shell history)
+- API responses contain only financial data (no credentials)
+
+See [Security](docs/SECURITY.md) for details.
+
+## Usage Examples
+
+### Check account balances
+```bash
+mmoney accounts list | jq '.accounts[] | {name: .displayName, balance: .currentBalance}'
+```
+
+### Find specific transactions
+```bash
+mmoney transactions list --search "Amazon" --start-date 2024-01-01 --end-date 2024-12-31
+```
+
+### Monthly spending summary
+```bash
+mmoney cashflow summary --timeframe last_month
+```
+
+### Export transactions to CSV
+```bash
+mmoney transactions list --format csv > transactions.csv
+```
+
+### Investment portfolio
+```bash
+mmoney holdings list --format csv
 ```
 
 ## Commands
@@ -150,72 +174,80 @@ mmoney institutions list    # Linked institutions
 mmoney subscription status  # Subscription details
 ```
 
-## Common Options
+### Common Options
 
-Most list commands support filtering:
+Most list commands support:
 - `--limit`, `-l`: Number of records
 - `--start-date`, `-s`: Start date (YYYY-MM-DD)
 - `--end-date`, `-e`: End date (YYYY-MM-DD)
-
-Example:
-```bash
-mmoney transactions list --limit 50 --start-date 2024-01-01 --end-date 2024-12-31
-```
-
-## Output
-
-All commands output JSON by default, making it easy to pipe to tools like `jq`:
-
-```bash
-mmoney accounts list | jq '.accounts[] | {name: .displayName, balance: .currentBalance}'
-```
-
-## Session Storage
-
-Sessions are stored securely using your system's keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Falls back to `~/.mmoney/session.pickle` if keychain is unavailable.
-
-**AI Agent Safety**: When using with Claude Code or other AI agents, your credentials remain secure - agents cannot access the OS keychain. See [Security](docs/SECURITY.md) for details.
+- `--format`, `-f`: Output format (json, csv, jsonl, text)
 
 ## Authentication Methods
 
-Recommended authentication methods in order of preference:
+Recommended methods in order of preference:
 
-1. **MFA Secret** (Best): Enable MFA in Monarch, copy the secret key when setting up your authenticator. Use `--mfa-secret` for fully automated, long-lasting auth
-2. **MFA Code**: Use `--mfa-code` with the 6-digit code from your authenticator app
-3. **Device UUID**: Get from browser console with `localStorage.getItem('monarchDeviceUUID')` and use `--device-uuid`
-4. **Token**: Get from browser Network tab (Authorization header) and use `--token` - shortest lived
+| Method | Flag | Best for |
+|--------|------|----------|
+| MFA Secret | `--mfa-secret` | Full automation, long-lasting |
+| MFA Code | `--mfa-code` | Manual entry, secure |
+| Device UUID | `--device-uuid` | Bypasses MFA |
+| Token | `--token` | Quick testing, shortest lived |
 
-Run `mmoney auth login --help` for detailed instructions on each method.
-
-## Claude Code Integration
-
-This CLI includes a skill for [Claude Code](https://claude.ai/claude-code) that enables natural language access to your financial data.
-
-### Install the Skill
-
-Copy the skill file to your project:
-
+**Get Device UUID:**
 ```bash
-mkdir -p .claude/commands
-curl -o .claude/commands/mmoney.md https://raw.githubusercontent.com/theFong/mmoney-cli/main/.claude/commands/mmoney.md
+# In browser console at app.monarchmoney.com:
+copy(localStorage.getItem('monarchDeviceUUID'))
 ```
 
-Or clone this repo and the skill is already included.
+**Get Token:**
+```bash
+# In browser Network tab, find 'Authorization: Token YOUR_TOKEN' header
+```
 
-### Usage
+Run `mmoney auth login --help` for detailed instructions.
 
-Once installed, Claude Code can use the mmoney CLI to answer questions like:
-- "What's my account balance?"
-- "Show me my spending on groceries last month"
-- "What are my recurring transactions?"
+## Session Storage
+
+Sessions are stored securely using your system's keychain:
+- **macOS**: Keychain
+- **Windows**: Credential Manager
+- **Linux**: Secret Service
+
+Falls back to `~/.mmoney/session.pickle` if keychain is unavailable.
+
+## Documentation
+
+- **[Command Reference](docs/commands.md)** - Complete guide to all commands
+- **[JSON Schemas](docs/schemas.md)** - Output schemas for agent integration
+- **[Security](docs/SECURITY.md)** - Credential storage and AI agent safety
+
+## Development
+
+```bash
+# Clone the repo
+git clone https://github.com/theFong/mmoney-cli.git
+cd mmoney-cli
+
+# Full setup (installs uv, deps, git hooks)
+./scripts/setup-dev.sh
+
+# Or use VS Code devcontainer
+# Open in VS Code and click "Reopen in Container"
+```
+
+**Quick commands:**
+```bash
+uv run mmoney --help        # Run the CLI
+uv run pytest tests/        # Run tests
+./scripts/setup-dev.sh lint # Run all linters
+./scripts/setup-dev.sh test # Run tests
+```
 
 ## Releasing
 
 1. Update version in `pyproject.toml`
 2. Commit and push to main
-3. Either:
-   - **Create a GitHub release**: `gh release create vX.Y.Z` (auto-publishes to PyPI)
-   - **Manual**: [Run the publish workflow](https://github.com/theFong/mmoney-cli/actions/workflows/publish.yml)
+3. Create release: `gh release create vX.Y.Z` (auto-publishes to PyPI)
 
 ## License
 
