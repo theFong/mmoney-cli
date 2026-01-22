@@ -679,7 +679,7 @@ def config_set(key: str, value: str) -> None:
     """Set a configuration value.
 
     Supported keys:
-      device-id    Device UUID from browser (used for MFA bypass)
+      device-id    Device UUID from browser (bypasses MFA requirement)
 
     Example:
       mmoney config set device-id YOUR_UUID
@@ -688,6 +688,9 @@ def config_set(key: str, value: str) -> None:
       1. Open https://app.monarchmoney.com and login
       2. Open DevTools Console (F12)
       3. Run: localStorage.getItem('monarchDeviceUUID')
+
+    With device-id set, login only needs email + password (no MFA):
+      mmoney auth login -e EMAIL -p PASSWORD --no-interactive
     """
     # Normalize key
     key_normalized = key.lower().replace("-", "_")
