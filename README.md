@@ -211,20 +211,11 @@ Once installed, Claude Code can use the mmoney CLI to answer questions like:
 
 ## Releasing
 
-To publish a new version to PyPI:
-
-```bash
-# 1. Update version in pyproject.toml
-# 2. Commit the change
-git add pyproject.toml
-git commit -m "Bump version to X.Y.Z"
-git push origin main
-
-# 3. Create a GitHub release (triggers PyPI publish via GitHub Actions)
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "Release notes here"
-```
-
-The `publish.yml` workflow automatically builds and uploads to PyPI when a release is created.
+1. Update version in `pyproject.toml`
+2. Commit and push to main
+3. Either:
+   - **Create a GitHub release**: `gh release create vX.Y.Z` (auto-publishes to PyPI)
+   - **Manual**: Go to Actions → "Publish to PyPI" → Run workflow
 
 ## License
 
