@@ -187,6 +187,28 @@ Recommended authentication methods in order of preference:
 
 Run `mmoney auth login --help` for detailed instructions on each method.
 
+## Claude Code Integration
+
+This CLI includes a skill for [Claude Code](https://claude.ai/claude-code) that enables natural language access to your financial data.
+
+### Install the Skill
+
+Copy the skill file to your project:
+
+```bash
+mkdir -p .claude/commands
+curl -o .claude/commands/mmoney.md https://raw.githubusercontent.com/theFong/mmoney-cli/main/.claude/commands/mmoney.md
+```
+
+Or clone this repo and the skill is already included.
+
+### Usage
+
+Once installed, Claude Code can use the mmoney CLI to answer questions like:
+- "What's my account balance?"
+- "Show me my spending on groceries last month"
+- "What are my recurring transactions?"
+
 ## License
 
 MIT
