@@ -18,16 +18,59 @@ Institution ──▶ Credential ──▶ Account ──┬──▶ Transactio
 - Transactions belong to one account, have one category, one merchant, and multiple tags
 - Categories belong to one group (e.g., "Groceries" → "Food & Drink")
 
-## Prerequisites
+## Authentication
 
-Check authentication status:
+Check status:
 ```bash
 mmoney auth status
 ```
 
-If not authenticated:
+### Method 1: Email + Password + MFA (Recommended)
+
+The most secure and longest-lasting method. Enable MFA on your Monarch account if not already enabled.
+
+**With MFA Secret (fully automated):**
+When setting up your authenticator app, copy the secret key shown alongside the QR code. This lets the CLI generate TOTP codes automatically.
 ```bash
-mmoney auth login --token YOUR_TOKEN
+mmoney auth login -e EMAIL -p PASSWORD --mfa-secret YOUR_SECRET --no-interactive
+```
+
+**With MFA Code (manual entry):**
+If you don't have the MFA secret, use a 6-digit code from your authenticator app.
+```bash
+mmoney auth login -e EMAIL -p PASSWORD --mfa-code 123456
+```
+
+### Method 2: Device ID (No MFA Required)
+
+If MFA is not enabled on your account, you can use a device ID from your browser to establish a trusted device. This avoids MFA prompts.
+
+**Step 1: Get the device ID from browser**
+
+Use Claude Code with `--chrome` to navigate to app.monarchmoney.com, login, then run in the browser console:
+```javascript
+localStorage.getItem('monarchDeviceUUID')
+```
+
+**Step 2: Save the device ID**
+```bash
+mmoney config set device-id YOUR_DEVICE_UUID
+```
+
+**Step 3: Login with just email + password**
+```bash
+mmoney auth login -e EMAIL -p PASSWORD --no-interactive
+```
+
+The device ID persists in `~/.mmoney/config.json`, so future logins only need email + password.
+
+### Config Commands
+
+```bash
+mmoney config list              # Show all config values
+mmoney config get device-id     # Get device ID
+mmoney config set device-id ID  # Set device ID
+mmoney config unset device-id   # Remove device ID
 ```
 
 ## Output Format
