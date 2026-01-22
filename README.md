@@ -54,15 +54,24 @@ mkdir -p .claude/commands && curl -o .claude/commands/mmoney.md https://raw.gith
 
 ### Example Prompts
 
-Once installed, ask Claude Code:
+Once installed, ask Claude Code things like:
 
-| You say | Claude runs |
-|---------|-------------|
-| "What's my account balance?" | `mmoney accounts list` |
-| "How much did I spend on groceries last month?" | `mmoney transactions list --search groceries --start-date ...` |
-| "Show my recurring transactions" | `mmoney recurring list` |
-| "What's my cashflow this month?" | `mmoney cashflow summary` |
-| "List my investment holdings" | `mmoney holdings list` |
+**Basic queries:**
+- "What's my account balance?"
+- "Show my recent transactions"
+- "List my recurring subscriptions"
+
+**Wealth advisor questions:**
+- "Do I have enough liquid cash to cover 6 months of expenses?"
+- "What's my savings rate this month vs last month?"
+- "Am I on track with my budget? Where am I overspending?"
+- "How much am I losing to subscriptions I might not need?"
+- "What's my net worth trend over the past year?"
+- "Show me my biggest spending categories - where can I cut back?"
+- "If I lost my job today, how long could I sustain my current lifestyle?"
+- "What percentage of my income is going to debt payments?"
+
+Claude will combine multiple commands, do the math, and give you actionable insights.
 
 ### Security with AI Agents
 
