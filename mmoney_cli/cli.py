@@ -578,7 +578,8 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 output_error(
                     code=ErrorCode.AUTH_MFA_FAILED,
                     message="MFA code rejected",
-                    details="The MFA code may be expired or incorrect. Codes are valid for 30 seconds.",
+                    details="The MFA code may be expired or incorrect. Codes are valid for 30 seconds. "
+                    "Note: Repeated 403 errors may indicate rate limiting - wait a few minutes.",
                     exit_code=ExitCode.AUTH_ERROR,
                 )
             else:
@@ -640,7 +641,8 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 output_error(
                     code=ErrorCode.AUTH_FAILED,
                     message="Authentication forbidden",
-                    details="Check your credentials. If MFA is enabled, use --mfa-secret or --mfa-code.",
+                    details="Check your credentials. If MFA is enabled, use --mfa-secret or --mfa-code. "
+                    "Note: Repeated 403 errors may indicate rate limiting - wait a few minutes.",
                     exit_code=ExitCode.AUTH_ERROR,
                 )
             elif "404" in error_str or "Not Found" in error_str:
