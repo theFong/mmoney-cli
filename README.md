@@ -215,7 +215,7 @@ Once installed, Claude Code can use the mmoney CLI to answer questions like:
 2. Commit and push to main
 3. Either:
    - **Create a GitHub release**: `gh release create vX.Y.Z` (auto-publishes to PyPI)
-   - **Manual**: Go to Actions → "Publish to PyPI" → Run workflow
+   - **Manual**: [Run the publish workflow](https://github.com/theFong/mmoney-cli/actions/workflows/publish.yml)
 
 ## License
 
