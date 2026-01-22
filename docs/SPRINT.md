@@ -21,6 +21,7 @@ Understanding effort and file changes helps parallelize work and avoid merge con
 |-------|-------|--------|---------------|
 | [#19](https://github.com/theFong/mmoney-cli/issues/19) | Comprehensive docs | L | `docs/*.md`, `README.md` |
 | [#13](https://github.com/theFong/mmoney-cli/issues/13) | JSON schema docs | M | `docs/schemas/`, `README.md` |
+| [#24](https://github.com/theFong/mmoney-cli/issues/24) | Security posture docs | S-M | `docs/SECURITY.md`, `README.md` |
 | [#17](https://github.com/theFong/mmoney-cli/issues/17) | Mock data for tests | M-L | `tests/fixtures/`, `tests/conftest.py` |
 | [#3](https://github.com/theFong/mmoney-cli/issues/3) | Dead code linting | S | `pyproject.toml`, `.github/workflows/ci.yml` |
 | [#4](https://github.com/theFong/mmoney-cli/issues/4) | Lint rules | S-M | `pyproject.toml`, `.github/workflows/ci.yml` |
@@ -85,7 +86,7 @@ These can run simultaneously without conflicts:
 
 | Stream | Issues | Owner |
 |--------|--------|-------|
-| Documentation | #19, #13 | Agent A |
+| Documentation | #19, #13, #24 | Agent A |
 | CI/CD | #3, #4, #20, #1 | Agent B |
 | Test Infrastructure | #17 | Agent C |
 | Agent Integration | #21, #22 | Agent D |
@@ -113,6 +114,7 @@ These can run simultaneously without conflicts:
 - [ ] Document all data objects and fields (#19)
 - [ ] Reference Monarch Money concepts (#19)
 - [ ] JSON schema for all outputs (#13)
+- [ ] Security posture and credential handling (#24)
 
 ### 2. Code Quality (Parallel)
 - [ ] Dead code linting in CI (#3)
