@@ -27,11 +27,48 @@ _OUTPUT_FORMAT = "output_format"
 # Config directory in user's home
 _CONFIG_DIR = Path.home() / ".mmoney"
 _SESSION_FILE = _CONFIG_DIR / "session.pickle"
+_CONFIG_FILE = _CONFIG_DIR / "config.json"
+
+# Environment variable names
+_ENV_DEVICE_ID = "MMONEY_DEVICE_ID"
 
 
 def _ensure_config_dir() -> None:
     """Create config directory if it doesn't exist."""
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _load_config() -> dict[str, Any]:
+    """Load config from file."""
+    if _CONFIG_FILE.exists():
+        try:
+            return json.loads(_CONFIG_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _save_config(config: dict[str, Any]) -> None:
+    """Save config to file."""
+    _ensure_config_dir()
+    _CONFIG_FILE.write_text(json.dumps(config, indent=2))
+
+
+def _get_device_id() -> str | None:
+    """Get device ID from env var or config file.
+
+    Priority: env var > config file
+    """
+    import os
+
+    # Check environment variable first
+    env_device_id = os.environ.get(_ENV_DEVICE_ID)
+    if env_device_id:
+        return env_device_id
+
+    # Fall back to config file
+    config = _load_config()
+    return config.get("device_id")
 
 
 __version__ = "0.1.0"
@@ -503,8 +540,13 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
             click.echo(f"Token saved to file ({_SESSION_FILE}).")
         return
 
-    if device_uuid:
-        mm._headers["Device-UUID"] = device_uuid
+    # Get device ID: CLI arg > env var > config file
+    effective_device_id = device_uuid or _get_device_id()
+    if effective_device_id:
+        mm._headers["Device-UUID"] = effective_device_id
+        if not device_uuid:
+            # Using stored device ID, inform user
+            click.echo(f"Using stored device ID: {effective_device_id[:8]}...")
 
     if mfa_code:
         # One-time MFA code login
@@ -613,6 +655,139 @@ def auth_status():
             pass
 
     click.echo("Not authenticated")
+
+
+# ============================================================================
+# Config Commands
+# ============================================================================
+
+
+@cli.group()
+def config():
+    """Configuration management.
+
+    Store settings like device ID for reuse across commands.
+    Config is stored in ~/.mmoney/config.json
+    """
+    pass
+
+
+@config.command("set")
+@click.argument("key")
+@click.argument("value")
+def config_set(key: str, value: str) -> None:
+    """Set a configuration value.
+
+    Supported keys:
+      device-id    Device UUID from browser (used for MFA bypass)
+
+    Example:
+      mmoney config set device-id YOUR_UUID
+
+    To get device UUID from browser:
+      1. Open https://app.monarchmoney.com and login
+      2. Open DevTools Console (F12)
+      3. Run: localStorage.getItem('monarchDeviceUUID')
+    """
+    # Normalize key
+    key_normalized = key.lower().replace("-", "_")
+
+    if key_normalized not in ("device_id",):
+        output_error(
+            code=ErrorCode.VALIDATION_INVALID_VALUE,
+            message=f"Unknown config key: {key}",
+            details="Supported keys: device-id",
+            exit_code=ExitCode.VALIDATION_ERROR,
+        )
+
+    cfg = _load_config()
+    cfg[key_normalized] = value
+    _save_config(cfg)
+    click.echo(f"Set {key} = {value}")
+
+
+@config.command("get")
+@click.argument("key")
+def config_get(key: str) -> None:
+    """Get a configuration value.
+
+    Example:
+      mmoney config get device-id
+    """
+    import os
+
+    key_normalized = key.lower().replace("-", "_")
+
+    if key_normalized not in ("device_id",):
+        output_error(
+            code=ErrorCode.VALIDATION_INVALID_VALUE,
+            message=f"Unknown config key: {key}",
+            details="Supported keys: device-id",
+            exit_code=ExitCode.VALIDATION_ERROR,
+        )
+
+    # Check env var first
+    env_var = f"MMONEY_{key_normalized.upper()}"
+    env_value = os.environ.get(env_var)
+    if env_value:
+        click.echo(f"{env_value} (from {env_var})")
+        return
+
+    # Check config file
+    cfg = _load_config()
+    value = cfg.get(key_normalized)
+    if value:
+        click.echo(value)
+    else:
+        click.echo(f"Not set (use 'mmoney config set {key} VALUE' or set {env_var})")
+
+
+@config.command("unset")
+@click.argument("key")
+def config_unset(key: str) -> None:
+    """Remove a configuration value.
+
+    Example:
+      mmoney config unset device-id
+    """
+    key_normalized = key.lower().replace("-", "_")
+
+    if key_normalized not in ("device_id",):
+        output_error(
+            code=ErrorCode.VALIDATION_INVALID_VALUE,
+            message=f"Unknown config key: {key}",
+            details="Supported keys: device-id",
+            exit_code=ExitCode.VALIDATION_ERROR,
+        )
+
+    cfg = _load_config()
+    if key_normalized in cfg:
+        del cfg[key_normalized]
+        _save_config(cfg)
+        click.echo(f"Unset {key}")
+    else:
+        click.echo(f"{key} was not set")
+
+
+@config.command("list")
+def config_list() -> None:
+    """List all configuration values."""
+    import os
+
+    cfg = _load_config()
+
+    # Check for env overrides
+    env_device_id = os.environ.get(_ENV_DEVICE_ID)
+
+    if not cfg and not env_device_id:
+        click.echo("No configuration set")
+        return
+
+    click.echo("Configuration:")
+    if env_device_id:
+        click.echo(f"  device-id: {env_device_id} (from {_ENV_DEVICE_ID})")
+    elif cfg.get("device_id"):
+        click.echo(f"  device-id: {cfg['device_id']}")
 
 
 # ============================================================================

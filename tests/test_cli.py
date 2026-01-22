@@ -830,6 +830,238 @@ class TestSubscriptionCommands:
 
 
 # ============================================================================
+# Config Command Tests
+# ============================================================================
+
+
+class TestConfigCommands:
+    """Tests for config commands."""
+
+    def test_config_set_device_id(self, runner, tmp_path, monkeypatch):
+        """Test setting device-id."""
+        # Use temp directory for config
+        config_dir = tmp_path / ".mmoney"
+        config_file = config_dir / "config.json"
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "set", "device-id", "test-uuid-123"])
+
+        assert result.exit_code == 0
+        assert "Set device-id = test-uuid-123" in result.output
+        assert config_file.exists()
+        config = json.loads(config_file.read_text())
+        assert config["device_id"] == "test-uuid-123"
+
+    def test_config_get_device_id(self, runner, tmp_path, monkeypatch):
+        """Test getting device-id from config file."""
+        config_dir = tmp_path / ".mmoney"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"device_id": "stored-uuid-456"}')
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "get", "device-id"])
+
+        assert result.exit_code == 0
+        assert "stored-uuid-456" in result.output
+
+    def test_config_get_device_id_from_env(self, runner, monkeypatch):
+        """Test getting device-id from environment variable."""
+        monkeypatch.setenv("MMONEY_DEVICE_ID", "env-uuid-789")
+
+        result = runner.invoke(cli, ["config", "get", "device-id"])
+
+        assert result.exit_code == 0
+        assert "env-uuid-789" in result.output
+        assert "MMONEY_DEVICE_ID" in result.output
+
+    def test_config_get_not_set(self, runner, tmp_path, monkeypatch):
+        """Test getting unset device-id."""
+        config_dir = tmp_path / ".mmoney"
+        config_file = config_dir / "config.json"
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "get", "device-id"])
+
+        assert result.exit_code == 0
+        assert "Not set" in result.output
+
+    def test_config_unset_device_id(self, runner, tmp_path, monkeypatch):
+        """Test unsetting device-id."""
+        config_dir = tmp_path / ".mmoney"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"device_id": "to-be-deleted"}')
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "unset", "device-id"])
+
+        assert result.exit_code == 0
+        assert "Unset device-id" in result.output
+        config = json.loads(config_file.read_text())
+        assert "device_id" not in config
+
+    def test_config_unset_not_set(self, runner, tmp_path, monkeypatch):
+        """Test unsetting device-id that was not set."""
+        config_dir = tmp_path / ".mmoney"
+        config_file = config_dir / "config.json"
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "unset", "device-id"])
+
+        assert result.exit_code == 0
+        assert "was not set" in result.output
+
+    def test_config_list_empty(self, runner, tmp_path, monkeypatch):
+        """Test listing config when empty."""
+        config_dir = tmp_path / ".mmoney"
+        config_file = config_dir / "config.json"
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "list"])
+
+        assert result.exit_code == 0
+        assert "No configuration set" in result.output
+
+    def test_config_list_with_values(self, runner, tmp_path, monkeypatch):
+        """Test listing config with values."""
+        config_dir = tmp_path / ".mmoney"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"device_id": "list-test-uuid"}')
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        result = runner.invoke(cli, ["config", "list"])
+
+        assert result.exit_code == 0
+        assert "device-id" in result.output
+        assert "list-test-uuid" in result.output
+
+    def test_config_set_invalid_key(self, runner):
+        """Test setting an invalid config key."""
+        result = runner.invoke(cli, ["config", "set", "invalid-key", "value"])
+
+        assert result.exit_code != 0
+        assert "Unknown config key" in result.output
+
+    def test_config_get_invalid_key(self, runner):
+        """Test getting an invalid config key."""
+        result = runner.invoke(cli, ["config", "get", "invalid-key"])
+
+        assert result.exit_code != 0
+        assert "Unknown config key" in result.output
+
+    def test_login_uses_stored_device_id(self, runner, tmp_path, monkeypatch):
+        """Test that login uses stored device ID when not provided."""
+        config_dir = tmp_path / ".mmoney"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"device_id": "stored-device-uuid"}')
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+            mm_instance = MagicMock()
+            mm_instance._headers = {}
+            mm_instance.multi_factor_authenticate = AsyncMock()
+            MockMM.return_value = mm_instance
+
+            result = runner.invoke(
+                cli,
+                [
+                    "auth",
+                    "login",
+                    "-e",
+                    "test@example.com",
+                    "-p",
+                    "password",
+                    "--mfa-code",
+                    "123456",
+                ],
+            )
+
+            # Check that device ID was set in headers
+            assert mm_instance._headers.get("Device-UUID") == "stored-device-uuid"
+            assert "Using stored device ID" in result.output
+
+    def test_login_cli_arg_overrides_stored_device_id(self, runner, tmp_path, monkeypatch):
+        """Test that CLI --device-uuid overrides stored device ID."""
+        config_dir = tmp_path / ".mmoney"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"device_id": "stored-device-uuid"}')
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+            mm_instance = MagicMock()
+            mm_instance._headers = {}
+            mm_instance.multi_factor_authenticate = AsyncMock()
+            MockMM.return_value = mm_instance
+
+            result = runner.invoke(
+                cli,
+                [
+                    "auth",
+                    "login",
+                    "-e",
+                    "test@example.com",
+                    "-p",
+                    "password",
+                    "--mfa-code",
+                    "123456",
+                    "--device-uuid",
+                    "cli-override-uuid",
+                ],
+            )
+
+            # CLI arg should override stored value
+            assert mm_instance._headers.get("Device-UUID") == "cli-override-uuid"
+            # Should NOT show "Using stored device ID" message
+            assert "Using stored device ID" not in result.output
+
+    def test_login_env_var_overrides_config(self, runner, tmp_path, monkeypatch):
+        """Test that MMONEY_DEVICE_ID env var overrides config file."""
+        config_dir = tmp_path / ".mmoney"
+        config_dir.mkdir(parents=True)
+        config_file = config_dir / "config.json"
+        config_file.write_text('{"device_id": "stored-device-uuid"}')
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_DIR", config_dir)
+        monkeypatch.setattr("mmoney_cli.cli._CONFIG_FILE", config_file)
+        monkeypatch.setenv("MMONEY_DEVICE_ID", "env-device-uuid")
+
+        with patch("mmoney_cli.cli.MonarchMoney") as MockMM:
+            mm_instance = MagicMock()
+            mm_instance._headers = {}
+            mm_instance.multi_factor_authenticate = AsyncMock()
+            MockMM.return_value = mm_instance
+
+            runner.invoke(
+                cli,
+                [
+                    "auth",
+                    "login",
+                    "-e",
+                    "test@example.com",
+                    "-p",
+                    "password",
+                    "--mfa-code",
+                    "123456",
+                ],
+            )
+
+            # Env var should override config file
+            assert mm_instance._headers.get("Device-UUID") == "env-device-uuid"
+
+
+# ============================================================================
 # CLI Version and Help Tests
 # ============================================================================
 
