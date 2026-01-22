@@ -56,12 +56,6 @@ mkdir -p .claude/commands && curl -o .claude/commands/mmoney.md https://raw.gith
 
 Once installed, ask Claude Code things like:
 
-**Basic queries:**
-- "What's my account balance?"
-- "Show my recent transactions"
-- "List my recurring subscriptions"
-
-**Wealth advisor questions:**
 - "Do I have enough liquid cash to cover 6 months of expenses?"
 - "What's my savings rate this month vs last month?"
 - "Am I on track with my budget? Where am I overspending?"
