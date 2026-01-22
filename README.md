@@ -49,8 +49,7 @@ This CLI is designed for use with [Claude Code](https://claude.ai/claude-code) a
 ### Install the Skill
 
 ```bash
-mkdir -p .claude/commands
-curl -o .claude/commands/mmoney.md https://raw.githubusercontent.com/theFong/mmoney-cli/main/.claude/commands/mmoney.md
+mkdir -p .claude/commands && curl -o .claude/commands/mmoney.md https://raw.githubusercontent.com/theFong/mmoney-cli/main/.claude/commands/mmoney.md
 ```
 
 ### Example Prompts
