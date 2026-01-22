@@ -232,3 +232,5 @@ mmoney --allow-mutations accounts update ACC_ID --name "New Name"
 | `VALIDATION_MISSING_FIELD` | Required parameter missing |
 | `NOT_FOUND` | Resource not found |
 | `API_ERROR` | Monarch Money API error |
+
+> **Note:** Repeated 403 errors may indicate rate limiting. Wait a few minutes before retrying.
