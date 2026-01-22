@@ -566,12 +566,28 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 mm.save_session(str(_SESSION_FILE))
                 click.echo(f"Session saved to file ({_SESSION_FILE}).")
         except Exception as e:
-            output_error(
-                code=ErrorCode.AUTH_MFA_FAILED,
-                message="MFA login failed",
-                details=str(e),
-                exit_code=ExitCode.AUTH_ERROR,
-            )
+            error_str = str(e)
+            if "429" in error_str or "Too Many Requests" in error_str:
+                output_error(
+                    code=ErrorCode.API_RATE_LIMIT,
+                    message="Rate limited - too many login attempts",
+                    details="Wait a few minutes before trying again.",
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
+            elif "403" in error_str or "Forbidden" in error_str:
+                output_error(
+                    code=ErrorCode.AUTH_MFA_FAILED,
+                    message="MFA code rejected",
+                    details="The MFA code may be expired or incorrect. Codes are valid for 30 seconds.",
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
+            else:
+                output_error(
+                    code=ErrorCode.AUTH_MFA_FAILED,
+                    message="MFA login failed",
+                    details=error_str,
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
     elif interactive:
         run_async(mm.interactive_login(save_session=False))
         # Save to keychain after interactive login
@@ -603,12 +619,44 @@ def auth_login(email, password, mfa_secret, mfa_code, token, device_uuid, intera
                 mm.save_session(str(_SESSION_FILE))
                 click.echo(f"Session saved to file ({_SESSION_FILE}).")
         except Exception as e:
-            output_error(
-                code=ErrorCode.AUTH_FAILED,
-                message="Login failed",
-                details=str(e),
-                exit_code=ExitCode.AUTH_ERROR,
-            )
+            error_str = str(e)
+            # Provide more helpful error messages
+            if "429" in error_str or "Too Many Requests" in error_str:
+                output_error(
+                    code=ErrorCode.API_RATE_LIMIT,
+                    message="Rate limited - too many login attempts",
+                    details="Wait a few minutes before trying again.",
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
+            elif "Multi-Factor Auth Required" in error_str:
+                output_error(
+                    code=ErrorCode.AUTH_MFA_REQUIRED,
+                    message="MFA required but not provided or invalid",
+                    details="Use --mfa-secret YOUR_SECRET or --mfa-code 123456. "
+                    "If using --mfa-secret, verify the secret is correct and your system clock is synced.",
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
+            elif "403" in error_str or "Forbidden" in error_str:
+                output_error(
+                    code=ErrorCode.AUTH_FAILED,
+                    message="Authentication forbidden",
+                    details="Check your credentials. If MFA is enabled, use --mfa-secret or --mfa-code.",
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
+            elif "404" in error_str or "Not Found" in error_str:
+                output_error(
+                    code=ErrorCode.AUTH_FAILED,
+                    message="Login endpoint not found",
+                    details="The Monarch Money API may be temporarily unavailable. Try again later.",
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
+            else:
+                output_error(
+                    code=ErrorCode.AUTH_FAILED,
+                    message="Login failed",
+                    details=error_str,
+                    exit_code=ExitCode.AUTH_ERROR,
+                )
 
     click.echo("Login successful!")
 
