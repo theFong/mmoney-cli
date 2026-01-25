@@ -44,7 +44,7 @@ mmoney cashflow summary                 # Income, expenses, savings
 
 ## Claude Code Integration
 
-This CLI is designed for use with [Claude Code](https://claude.ai/claude-code) and other AI agents.
+This CLI is designed for use with [Claude Code](https://code.claude.com/docs/en/overview) and other AI agents.
 
 ### Install the Skill
 
