@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Monarch Money CLI - Command line interface for the Monarch Money API."""
-
 from __future__ import annotations
 
+# Monarch Money CLI - Command line interface for the Monarch Money API.
 import asyncio
 import csv
 import functools
