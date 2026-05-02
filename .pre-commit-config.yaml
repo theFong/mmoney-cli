@@ -16,7 +16,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: pytest tests/ -x -q
+        entry: uv run --no-sync pytest tests/ -x -q
         language: system
         pass_filenames: false
         stages: [pre-push]
