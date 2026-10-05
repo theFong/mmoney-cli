@@ -698,24 +698,53 @@ class TestSpecialResponses:
             output = json.loads(result.output)
             assert len(output["allTransactions"]["results"]) == 1000
 
-    def test_holdings_snapshots_date_parsing(self, runner):
-        """Test holdings snapshots with date parsing."""
-        with patch("mmoney_cli.cli.get_client") as mock_get_client:
-            mm_instance = MagicMock()
-            mm_instance.get_aggregate_snapshots = AsyncMock(return_value={"snapshots": []})
-            mock_get_client.return_value = mm_instance
+    @pytest.mark.parametrize(
+        ("options", "start_date", "end_date"),
+        [
+            ([], None, None),
+            (["-s", "2026-08-20"], "2026-08-20", None),
+            (["-e", "2026-08-26"], None, "2026-08-26"),
+            (
+                ["--start-date", "2026-08-20", "--end-date", "2026-08-26"],
+                "2026-08-20",
+                "2026-08-26",
+            ),
+        ],
+    )
+    def test_holdings_snapshots_serializable_dates(self, runner, options, start_date, end_date):
+        """Exercise the real library through GraphQL variable serialization (issue #29)."""
+        from datetime import date
 
+        from monarchmoney import MonarchMoney
+
+        mm_instance = MonarchMoney()
+        snapshots = {"aggregateSnapshots": [{"date": "2026-08-20", "balance": 100.0}]}
+
+        async def serialize_request(**kwargs):
+            # The transport serializes variables with the standard JSON encoder.
+            json.dumps(kwargs["variables"])
+            return snapshots
+
+        with (
+            patch("mmoney_cli.cli.get_client", return_value=mm_instance),
+            patch.object(mm_instance, "gql_call", side_effect=serialize_request) as gql_call,
+        ):
             result = runner.invoke(
-                cli,
-                ["holdings", "snapshots", "-s", "2024-01-01", "-e", "2024-12-31"],
+                cli, ["-f", "json", "holdings", "snapshots", "-t", "investment", *options]
             )
 
-            assert result.exit_code == 0
-            call_kwargs = mm_instance.get_aggregate_snapshots.call_args[1]
-            from datetime import date
-
-            assert call_kwargs["start_date"] == date(2024, 1, 1)
-            assert call_kwargs["end_date"] == date(2024, 12, 31)
+            assert result.exit_code == 0, result.output
+            assert json.loads(result.output) == snapshots
+            gql_call.assert_awaited_once()
+            filters = gql_call.call_args.kwargs["variables"]["filters"]
+            if start_date is None:
+                today = date.today()
+                start_date = date(today.year - 150, today.month, 1).isoformat()
+            assert filters == {
+                "startDate": start_date,
+                "endDate": end_date,
+                "accountType": "investment",
+            }
 
     def test_holdings_snapshots_with_account_type(self, runner):
         """Test holdings snapshots with account type filter."""
