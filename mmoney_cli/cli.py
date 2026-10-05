@@ -1009,11 +1009,17 @@ def holdings_snapshots(start_date, end_date, account_type):
     """Get aggregate balance snapshots."""
     mm = get_client()
 
-    start = date.fromisoformat(start_date) if start_date else None
-    end = date.fromisoformat(end_date) if end_date else None
+    # Validate dates, but pass JSON-serializable ISO strings to the GraphQL client.
+    start = date.fromisoformat(start_date).isoformat() if start_date else None
+    end = date.fromisoformat(end_date).isoformat() if end_date else None
 
     result = run_async(
-        mm.get_aggregate_snapshots(start_date=start, end_date=end, account_type=account_type)
+        mm.get_aggregate_snapshots(
+            # The library annotates these as date, but sends them directly as JSON variables.
+            start_date=start,  # pyright: ignore[reportArgumentType]
+            end_date=end,  # pyright: ignore[reportArgumentType]
+            account_type=account_type,
+        )
     )
     output_result(result)
 
