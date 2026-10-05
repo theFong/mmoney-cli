@@ -70,7 +70,7 @@ def _get_device_id() -> str | None:
     return config.get("device_id")
 
 
-__version__ = "0.1.0"
+__version__ = "0.1.4"
 
 
 # ============================================================================
